@@ -11,6 +11,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
-    "@tauri-apps/cli": "^2.8.5"
+    "@tauri-apps/cli": "^2.8.5",
+    "lucide-static": "1.44.0"
   }
 }

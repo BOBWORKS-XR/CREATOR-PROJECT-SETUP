@@ -5,40 +5,49 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Creator Project Setup</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="suite.css">
 </head>
 <body>
+  <button class="suite-trigger" id="suite-trigger" type="button" aria-expanded="false" aria-controls="suite-menu" aria-label="Open Creator apps" title="Creator apps">
+    <span class="suite-mark"><img src="creator-works-logo.png" alt=""><span class="suite-letter">P</span></span>
+  </button>
+  <nav id="suite-menu" class="suite-menu hidden" aria-label="Creator apps">
+    <div class="suite-menu-heading"><span>Creator apps</span><button id="suite-close" class="icon-button" type="button" aria-label="Close Creator apps" title="Close"><span class="icon icon-close" aria-hidden="true"></span></button></div>
+    <button class="suite-item" type="button" data-suite-link="hub">
+      <span class="suite-mark hub-mark"><img src="creator-works-logo.png" alt=""><span class="suite-letter">H</span></span>
+      <span class="suite-item-copy"><strong>Creator Hub</strong><small>In development</small></span><span class="icon icon-external" aria-hidden="true"></span>
+    </button>
+    <button class="suite-item" type="button" data-suite-link="mcp">
+      <span class="suite-mark"><img src="creator-works-logo.png" alt=""><span class="suite-letter">M</span></span>
+      <span class="suite-item-copy"><strong>Creator Works MCP</strong><small>Releases</small></span><span class="icon icon-external" aria-hidden="true"></span>
+    </button>
+    <button class="suite-item current" type="button" aria-current="page" id="suite-current">
+      <span class="suite-mark"><img src="creator-works-logo.png" alt=""><span class="suite-letter">P</span></span>
+      <span class="suite-item-copy"><strong>Project Setup</strong><small>Current app</small></span><span class="suite-current-dot" aria-hidden="true"></span>
+    </button>
+    <div class="suite-item unavailable"><span class="suite-future-mark" aria-hidden="true">U</span><span class="suite-item-copy"><strong>URP Converter</strong><small>Coming soon</small></span></div>
+    <p id="suite-error" class="suite-error hidden" role="status"></p>
+  </nav>
   <header class="app-header">
-    <div class="brand">
-      <img src="creator-works-logo.png" alt="Creator Works">
-      <div>
-        <div class="brand-name"><span>CREATOR</span> <strong>PROJECT</strong> SETUP</div>
-        <div class="brand-subtitle">SIDEQUEST CREATOR SDK</div>
-      </div>
+    <div class="title-block">
+      <h1 class="brand-name"><span>CREATOR</span> <strong>PROJECT</strong> SETUP</h1>
+      <p id="mode-description">Unity and Creator SDK. Android + Windows.</p>
     </div>
     <div id="overall-status" class="overall-status checking"><span></span>Checking</div>
   </header>
 
   <main>
-    <section class="intro">
-      <p class="eyebrow" id="mode-eyebrow">NEW PROJECT</p>
-      <h1 id="mode-heading">Build-ready Unity setup</h1>
-      <p id="mode-description">Create a clean Creator SDK project with the correct Unity, URP, Android and Windows requirements.</p>
-    </section>
-
+    <div class="workspace-toolbar">
     <nav class="mode-tabs" role="tablist" aria-label="Project workflow">
       <button type="button" id="new-mode" role="tab" aria-selected="true" aria-controls="new-project-pane">New project</button>
       <button type="button" id="existing-mode" role="tab" aria-selected="false" aria-controls="existing-project-pane">Existing project</button>
     </nav>
+    <button id="refresh-button" class="icon-button" type="button" title="Check requirements again" aria-label="Check requirements again"><span class="icon icon-refresh" aria-hidden="true"></span></button>
+    </div>
 
     <div class="workspace">
       <section id="new-project-pane" class="setup-pane" role="tabpanel" aria-labelledby="new-mode">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">PROJECT</p>
-            <h2 id="project-heading">Project details</h2>
-          </div>
-          <button id="refresh-button" class="icon-button" type="button" title="Check requirements again" aria-label="Check requirements again">↻</button>
-        </div>
+        <div id="project-details">
 
         <label for="project-name">Project name</label>
         <input id="project-name" type="text" maxlength="64" value="My Creator Space" autocomplete="off">
@@ -46,35 +55,39 @@
         <label for="parent-folder">Project location</label>
         <div class="input-action">
           <input id="parent-folder" type="text" autocomplete="off" spellcheck="false">
-          <button id="browse-button" class="secondary-button" type="button">Browse</button>
+          <button id="browse-button" class="secondary-button" type="button"><span class="icon icon-folder" aria-hidden="true"></span>Browse</button>
         </div>
 
         <div class="recipe-line" id="recipe-line">Loading approved recipe…</div>
 
         <button id="create-button" class="primary-button" type="button" disabled>Create and validate project</button>
-        <button id="open-project-button" class="primary-button hidden" type="button">Open project in Unity</button>
-        <button id="create-another-button" class="text-button full-width hidden" type="button">Create another project</button>
-
+        </div>
+        <div id="project-summary" class="project-summary hidden">
+          <span class="summary-icon"><span class="icon icon-folder" aria-hidden="true"></span></span>
+          <div><h2 id="summary-name"></h2><p id="summary-path"></p></div>
+        </div>
         <div id="activity" class="activity hidden" aria-live="polite">
           <div class="activity-header"><span class="spinner"></span><strong id="activity-title">Preparing project</strong></div>
           <p id="activity-message">Unity may take several minutes while packages resolve and compile.</p>
+          <progress id="stage-progress" max="7" value="0" aria-label="Completed setup stages"></progress>
           <ol id="progress-steps" class="progress-steps" aria-label="Setup stages"></ol>
           <span id="elapsed-time" class="elapsed-time"></span>
         </div>
         <div id="result" class="result hidden" aria-live="polite"></div>
+        <button id="open-project-button" class="primary-button hidden" type="button">Open project in Unity</button>
+        <button id="create-another-button" class="text-button full-width hidden" type="button">Create another project</button>
         <div id="hub-result" class="hub-result hidden" aria-live="polite"></div>
         <button id="retry-hub-button" class="secondary-button full-width hidden" type="button">Retry adding to Unity Hub</button>
         <button id="restart-hub-button" class="secondary-button full-width hidden" type="button">Restart Unity Hub</button>
         <button id="open-result-hub-button" class="text-button full-width hidden" type="button">Open Unity Hub</button>
-        <div id="action-error" class="result hidden" role="alert"></div>
       </section>
 
       <section id="existing-project-pane" class="setup-pane hidden" role="tabpanel" aria-labelledby="existing-mode">
-        <div class="section-heading"><div><p class="eyebrow">PROJECT</p><h2>Inspect and repair</h2></div><span class="preview-label">PREVIEW</span></div>
+        <div class="section-heading"><h2>Inspect and repair</h2><span class="preview-label">Experimental</span></div>
         <label for="existing-path">Unity project folder</label>
         <div class="input-action">
           <input id="existing-path" type="text" autocomplete="off" spellcheck="false">
-          <button id="existing-browse" class="secondary-button" type="button">Browse</button>
+          <button id="existing-browse" class="secondary-button" type="button"><span class="icon icon-folder" aria-hidden="true"></span>Browse</button>
         </div>
         <button id="inspect-button" class="secondary-button full-width" type="button">Inspect project</button>
         <div id="inspection-results" class="hidden">
@@ -96,10 +109,7 @@
 
       <section class="requirements-pane" aria-labelledby="requirements-heading">
         <div class="section-heading">
-          <div>
-            <p class="eyebrow">THIS COMPUTER</p>
-            <h2 id="requirements-heading">Requirements</h2>
-          </div>
+          <h2 id="requirements-heading">Requirements</h2>
           <span id="platform-label" class="platform-label">Detecting</span>
         </div>
         <div id="requirements" class="requirements"></div>
@@ -108,13 +118,15 @@
         <button id="unity-download-button" class="text-button hidden" type="button">Download Unity Hub</button>
       </section>
     </div>
+    <div id="action-error" class="result hidden" role="alert"></div>
 
   </main>
 
   <footer>
-    <span>Creator Project Setup 0.3.0-alpha.1</span>
-    <button id="sdk-source-button" class="text-button" type="button">Creator SDK source</button>
+    <span>Creator Project Setup <span class="footer-version">0.3.0-alpha.1</span></span>
+    <div class="footer-links"><button id="github-button" class="text-button" type="button">GitHub <span class="icon icon-external" aria-hidden="true"></span></button><button id="sdk-source-button" class="text-button" type="button">Creator SDK source <span class="icon icon-external" aria-hidden="true"></span></button></div>
   </footer>
+  <script src="suite.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

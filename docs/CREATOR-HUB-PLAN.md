@@ -7,6 +7,10 @@ its immutable downloads or claims Hub compatibility for that existing build.
 ## Product Boundary
 
 - Collapsible left navigation with a real menu toggle and icon tooltips.
+- Shared compact chrome: a protruding cube-logo tab without hamburger lines,
+  H/M/P corner badges, and a gray outer frame for Hub. Keep standalone navigation
+  until a trusted hosted-context contract exists; installation presence alone
+  never changes how the UI behaves.
 - Creator Works MCP and Creator Project Setup show Install, Open, or Update.
 - URP Converter is Coming soon, with no fake install or download action.
 - Flat tool detail pages, installed/available versions, download progress, and
@@ -124,6 +128,18 @@ Background downloading is opt-in; installation is a separate explicit action.
    running MCP server, and repeated Open with preserved GUI state.
 6. Later: a shared project picker and hosted tool interfaces, only if useful.
    Player emulation is outside this plan; URP remains Coming soon.
+
+## Interface Pass: 2026-09-10
+
+Setup and MCP now have coordinated next-version compact interfaces. Setup's
+creation fields collapse into a summary/progress view without changing the
+underlying Unity creation or repair contracts. See [UI preview](UI-PREVIEW.md).
+
+A separate local Creator Hub `0.1.0-alpha.1` interface shell now provides an app
+catalog, detail views, accessible switcher and pinned public release/source
+links. It does not yet install, inventory, update, or embed apps. Its Windows
+EXE is an interface preview, not completion of gates 3-5 above. This distinction
+must remain visible in the app and any download description.
 
 Next-version support may ship independently after both app contracts agree.
 It must not be advertised as a complete Hub or safe automatic updater. Windows

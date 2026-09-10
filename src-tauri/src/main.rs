@@ -104,6 +104,9 @@ fn open_official_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
         "https://unity.com/download",
         "https://docs.unity.com/en-us/unity-cli/use-unity-cli",
         "https://greenfield-registry.sdq.st/-/web/detail/com.sidequest.creator-sdk",
+        "https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP",
+        "https://github.com/BOBWORKS-XR/CREATOR-WORKS-UNITY-MCP/releases",
+        "https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/blob/master/docs/CREATOR-HUB-PLAN.md",
     ];
     if !allowed.contains(&url.as_str()) {
         return Err("Only pinned official setup links can be opened.".into());

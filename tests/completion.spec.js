@@ -1,6 +1,4 @@
 const { test, expect } = require('@playwright/test');
-const { pathToFileURL } = require('node:url');
-const path = require('node:path');
 
 async function setup(page, options = {}) {
   await page.addInitScript(options => {
@@ -41,7 +39,7 @@ async function setup(page, options = {}) {
       if (command === 'open_project' && window.options.failOpen) throw 'Unity could not be opened.';
     } } };
   }, options);
-  await page.goto(pathToFileURL(path.resolve('src/index.html')).href);
+  await page.goto('http://127.0.0.1:4187');
   await expect(page.locator('#create-button')).toBeEnabled();
 }
 
@@ -211,7 +209,7 @@ for (const width of [980, 720]) {
     await inspectExisting(page);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath('repair-review.png'), fullPage: true });
-    expect(await page.locator('.brand img').evaluate(img => img.naturalWidth > 0)).toBe(true);
+    expect(await page.locator('.suite-trigger img').evaluate(img => img.naturalWidth > 0)).toBe(true);
   });
 }
 
@@ -275,6 +273,9 @@ test('creation failure allows retry without claiming a completed project', async
   await expect(page.locator('#create-button')).toBeEnabled();
   await expect(page.locator('#open-project-button')).toBeHidden();
   await expect(page.locator('#project-name')).toBeEnabled();
+  await expect(page.locator('#project-details')).toBeVisible();
+  await expect(page.locator('#project-name')).toHaveValue('My Creator Space');
+  await expect(page.locator('#project-summary')).toBeHidden();
 });
 
 test('creating another project explicitly unlocks a new name', async ({ page }) => {
@@ -283,6 +284,8 @@ test('creating another project explicitly unlocks a new name', async ({ page }) 
   await page.locator('#create-another-button').click();
   await expect(page.locator('#project-name')).toBeEmpty();
   await expect(page.locator('#project-name')).toBeFocused();
+  await expect(page.locator('#project-details')).toBeVisible();
+  await expect(page.locator('#project-summary')).toBeHidden();
   await expect(page.locator('#result')).toBeHidden();
   await page.locator('#project-name').fill('Second project');
   await page.locator('#create-button').click();
@@ -299,5 +302,80 @@ for (const width of [980, 720]) {
     await expect(page.locator('#result')).toHaveClass('result success');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath('completed.png'), fullPage: true });
+  });
+}
+
+test('creation replaces fields with a summary, without changing the request', async ({ page }) => {
+  await setup(page, { pending: true });
+  await page.locator('#project-name').fill('Forest <test>');
+  await page.locator('#create-button').click();
+  await expect(page.locator('#project-details')).toBeHidden();
+  await expect(page.locator('#summary-name')).toHaveText('Forest <test>');
+  await expect(page.locator('#activity')).toBeVisible();
+  await page.evaluate(() => window.progressCallback({ payload: { step: 4, detail: 'Compiling.' } }));
+  await expect(page.locator('#stage-progress')).toHaveJSProperty('value', 3);
+  await page.evaluate(() => window.progressCallback({ payload: { step: 2, detail: 'Old event.' } }));
+  await expect(page.locator('#stage-progress')).toHaveJSProperty('value', 3);
+  await page.evaluate(() => window.finishCreate());
+  await expect(page.locator('#project-details')).toBeHidden();
+  await expect(page.locator('#summary-path')).toHaveText('F:\\UnityTest\\Forest <test>');
+  await expect(page.locator('#activity')).toBeHidden();
+});
+
+test('app switcher supports keyboard, outside dismissal and bounded links', async ({ page }) => {
+  await setup(page);
+  const trigger = page.locator('#suite-trigger');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-suite-link="hub"]')).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('[data-suite-link="mcp"]')).toBeFocused();
+  await page.keyboard.press('Enter');
+  expect(await page.evaluate(() => window.calls.at(-1))).toEqual({ command: 'open_official_url', args: { url: 'https://github.com/BOBWORKS-XR/CREATOR-WORKS-UNITY-MCP/releases' } });
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  await expect(page.locator('#suite-menu')).toBeHidden();
+  await trigger.click();
+  await page.locator('#project-name').click();
+  await expect(page.locator('#suite-menu')).toBeHidden();
+  await expect(page.locator('#project-name')).toBeFocused();
+  await trigger.click();
+  await page.keyboard.press('End');
+  await expect(page.locator('#suite-current')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#suite-menu')).toBeHidden();
+  expect(await page.evaluate(() => window.calls.every(call => ['probe_environment', 'open_official_url'].includes(call.command)))).toBe(true);
+});
+
+test('external link failures are visible and do not claim installation', async ({ page }) => {
+  await setup(page);
+  await page.evaluate(() => window.__TAURI__.core.invoke = async () => { throw 'Browser unavailable'; });
+  await page.locator('#suite-trigger').click();
+  await page.locator('[data-suite-link="hub"]').click();
+  await expect(page.locator('#suite-error')).toContainText('Browser unavailable');
+  await expect(page.locator('[data-suite-link="hub"]')).toContainText('In development');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#suite-trigger')).toBeFocused();
+});
+
+for (const width of [980, 720, 560, 390]) {
+  test(`compact shell at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 620 });
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await setup(page);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(await page.locator('.suite-trigger img').evaluate(img => img.naturalWidth)).toBe(1024);
+    if (width === 980) {
+      expect((await page.locator('#create-button').boundingBox()).y).toBeLessThan(350);
+      expect((await page.locator('footer').boundingBox()).y).toBeLessThan(620);
+    }
+    await page.screenshot({ path: testInfo.outputPath('setup.png'), fullPage: true });
+    await page.locator('#suite-trigger').click();
+    await expect(page.locator('#suite-menu')).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('switcher.png'), fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(errors).toEqual([]);
   });
 }

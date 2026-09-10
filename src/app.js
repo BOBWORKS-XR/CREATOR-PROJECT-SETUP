@@ -28,6 +28,7 @@ const elements = {
 let environment = null;
 let createdProject = null;
 let busy = false;
+let creating = false;
 let checking = false;
 let opening = false;
 let restartingHub = false;
@@ -50,6 +51,7 @@ let currentStep = 0;
 function renderProgress({ step, detail }) {
   if (!Number.isInteger(step) || step < currentStep || step < 1 || step > stages.length) return;
   currentStep = step;
+  document.querySelector('#stage-progress').value = step - 1;
   elements.activityTitle.textContent = stages[step - 1];
   elements.activityMessage.textContent = detail;
   elements.progressSteps.innerHTML = stages.map((label, index) => `<li class="${index + 1 < step ? 'done' : index + 1 === step ? 'current' : ''}" ${index + 1 === step ? 'aria-current="step"' : ''}>${label}</li>`).join('');
@@ -57,6 +59,13 @@ function renderProgress({ step, detail }) {
 
 function updateControls() {
   const locked = busy || inspecting || checking || Boolean(createdProject);
+  const showSummary = creating || Boolean(createdProject);
+  document.querySelector('#project-details').classList.toggle('hidden', showSummary);
+  document.querySelector('#project-summary').classList.toggle('hidden', !showSummary);
+  if (showSummary) {
+    document.querySelector('#summary-name').textContent = elements.projectName.value;
+    document.querySelector('#summary-path').textContent = createdProject || elements.parentFolder.value;
+  }
   for (const field of [elements.projectName, elements.parentFolder, elements.browse]) field.disabled = locked;
   elements.create.disabled = locked || !environment?.ready;
   elements.create.classList.toggle('hidden', Boolean(createdProject));
@@ -159,10 +168,12 @@ elements.hub.addEventListener('click', async () => {
 
 elements.unityDownload.addEventListener('click', () => invoke('open_official_url', { url: 'https://unity.com/download' }).catch(showActionError));
 elements.sdkSource.addEventListener('click', () => invoke('open_official_url', { url: 'https://greenfield-registry.sdq.st/-/web/detail/com.sidequest.creator-sdk' }).catch(showActionError));
+document.querySelector('#github-button').addEventListener('click', () => invoke('open_official_url', { url: 'https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP' }).catch(showActionError));
 
 elements.create.addEventListener('click', async () => {
   if (mode !== 'new' || busy || inspecting || checking || createdProject || !environment?.ready) return;
   busy = true;
+  creating = true;
   updateControls();
   elements.actionError.classList.add('hidden');
   elements.result.classList.add('hidden');
@@ -197,6 +208,7 @@ elements.create.addEventListener('click', async () => {
     clearInterval(timer);
     if (unlisten) unlisten();
     busy = false;
+    creating = false;
     elements.activity.classList.add('hidden');
     elements.result.classList.remove('hidden');
     updateControls();
@@ -291,9 +303,7 @@ function setMode(value) {
   document.querySelector('#existing-project-pane').classList.toggle('hidden', isNew);
   newMode.setAttribute('aria-selected', String(isNew));
   existingMode.setAttribute('aria-selected', String(!isNew));
-  document.querySelector('#mode-eyebrow').textContent = isNew ? 'NEW PROJECT' : 'EXISTING PROJECT';
-  document.querySelector('#mode-heading').textContent = isNew ? 'Build-ready Unity setup' : 'Project health check';
-  document.querySelector('#mode-description').textContent = isNew ? 'Create a clean Creator SDK project with the correct Unity, URP, Android and Windows requirements.' : 'Creator SDK, package, Visual Scripting and build-platform validation.';
+  document.querySelector('#mode-description').textContent = isNew ? 'Unity and Creator SDK. Android + Windows.' : 'Packages, Visual Scripting and build requirements.';
   updateControls();
 }
 newMode.addEventListener('click', () => setMode('new'));

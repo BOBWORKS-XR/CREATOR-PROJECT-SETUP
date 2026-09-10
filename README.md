@@ -11,6 +11,10 @@ been exercised on real machines.
 
 ## Download 0.2.2
 
+Development branch: `0.3.0-alpha.1` adds read-only Creator Hub identity and a
+compact shared app interface. See [the UI preview notes](docs/UI-PREVIEW.md).
+These changes are not included in the stable download below.
+
 [Download the Windows portable EXE](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/download/v0.2.2/Creator-Project-Setup-0.2.2-Windows.exe)
 or see the [0.2.2 release](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.2.2)
 for the optional installer, portable ZIP, checksums, and known limitations.
