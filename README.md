@@ -36,8 +36,8 @@ both the declared and observed values instead of hiding that discrepancy.
 - Reopen Unity in a second batch session to check that configuration persisted.
 - Show real setup stages, recent import activity, and elapsed time. Stage counts
   are not download percentages or an estimate of time remaining.
-- Add completed projects to Unity Hub automatically, then read back the registry
-  to verify the exact project path. Opening the Editor is a separate action.
+- With a compatible Hub, add completed projects automatically and read back the
+  registry to verify the exact project path. Opening the Editor is separate.
 - Open Unity Hub for missing installations and open a completed project.
 - Keep a completed project ready to open; creating another project is a separate
   action, so a second click cannot restart creation in the same folder.
@@ -56,9 +56,15 @@ or Android APK, uploaded a space, or tested interaction in a headset.
 Setup logs and receipts are kept in `.creator-project-setup` inside the created
 project. The temporary Editor validator is removed after successful creation.
 
-## 0.2.0 Preview
+## 0.2.1 Preview
 
 ### Automatic Unity Hub Registration
+
+Automatic registration requires **Unity Hub 3.21.1 or newer**, opened at least
+once so its version can be detected. Older or unknown Hub versions do not block
+project creation, but Setup reports that automatic registration is unavailable.
+Use Hub's **Add > Add project from disk**, or update and open Hub, then select
+**Recheck Hub and add project**. The project is not recreated.
 
 After new-project validation, Setup uses the official
 [Unity CLI project commands](https://docs.unity.com/en-us/unity-cli/unity-cli-reference#manage-projects-in-the-hub-registry)
@@ -68,11 +74,17 @@ size and SHA-256, and rechecks the cached helper before execution. No Git,
 terminal, PATH change, or separate CLI installation is required.
 
 Registration has its own progress stage and retry action. A download or Hub
-failure does not discard the validated project or prevent opening it. An already
-running older Hub may need reopening to refresh its project list. Setup does not
+failure does not discard the validated project or prevent opening it. Setup does not
 edit Hub's internal database, link a Unity Cloud project, or change analytics
 consent. The helper is a Unity beta component, not source code bundled under this
 repository's MIT license.
+
+**Correction to 0.2.0:** a CLI readback was incorrectly presented as proof of
+registration with any desktop Hub. Hub 3.14.4 reads `projects-v1.json`, whereas
+the pinned CLI writes `hub.db`. Restarting that older Hub does not bridge the two
+stores. Version 0.2.1 checks compatibility first and no longer claims the project
+is visible in the Hub UI. Hub 3.21.1's shared SQLite storage was checked in its
+distributed application code; native post-upgrade UI acceptance is still needed.
 
 ### Existing Projects
 

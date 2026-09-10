@@ -22,7 +22,9 @@
 - Merge custom Visual Scripting selections and verify them on reopening.
 - Re-run package, compilation, render-pipeline, and platform validation.
 - Register completed new projects using a pinned, checksum-verified official
-  Unity CLI helper. Verify registration and allow independent retry.
+  Unity CLI helper with a compatible desktop Hub. Require Hub 3.21.1+, distinguish
+  CLI records from UI visibility, and allow independent retry. Older Hubs keep the
+  manual Add-from-disk route; do not present CLI-only records as desktop success.
 - Do not edit Hub's private database or silently link Unity Cloud.
 
 Still required before promoting repair beyond preview: broader existing-project

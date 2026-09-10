@@ -70,6 +70,7 @@ function updateControls() {
   repairButton.disabled = busy || inspecting || !existingReport?.canRepair || !existing.approval.checked;
   validateButton.disabled = busy || inspecting || !existingReport?.canValidate || !existing.approval.checked;
   retryHub.disabled = busy || inspecting || opening;
+  document.querySelector('#open-result-hub-button').disabled = busy || inspecting || opening;
   elements.createAnother.disabled = busy || opening || checking;
   elements.openProject.disabled = busy || opening;
   document.querySelector('#open-existing-button').disabled = busy || opening;
@@ -88,8 +89,8 @@ function showActionError(error) {
 
 function requirement(name, ok, value) {
   return `<div class="requirement ${ok ? 'ok' : 'bad'}">
-    <span class="status-dot"></span><span class="requirement-name">${name}</span>
-    <span class="requirement-value">${value}</span>
+    <span class="status-dot"></span><span class="requirement-name">${escapeHtml(name)}</span>
+    <span class="requirement-value">${escapeHtml(value)}</span>
   </div>`;
 }
 
@@ -108,13 +109,14 @@ function renderEnvironment(report) {
   }
   elements.recipe.textContent = `Approved recipe: Unity ${report.recipe.editorVersion} · Creator SDK ${report.recipe.creatorSdkVersion} · URP ${report.recipe.urpVersion} · Input ${report.recipe.inputSystemVersion}`;
   elements.requirements.innerHTML = [
-    requirement('Unity Hub or Unity CLI', report.hubInstalled || report.unityCliInstalled, report.hubInstalled ? 'Hub detected' : report.unityCliInstalled ? 'CLI detected' : 'Missing'),
+    requirement('Unity Hub or Unity CLI', report.hubInstalled || report.unityCliInstalled, report.hubInstalled ? report.hubVersion ? `Hub ${report.hubVersion}` : 'Hub detected' : report.unityCliInstalled ? 'CLI detected' : 'Missing'),
     requirement(`Unity ${report.recipe.editorVersion}`, Boolean(editor), editor ? 'Installed' : 'Missing'),
     requirement('Android Build Support', Boolean(editor?.androidPlayer), editor?.androidPlayer ? 'Installed' : 'Missing'),
     requirement('Android SDK, NDK and OpenJDK', Boolean(editor?.androidSdk && editor?.androidNdk && editor?.openJdk), editor?.androidSdk && editor?.androidNdk && editor?.openJdk ? 'Installed' : 'Incomplete'),
     requirement('Windows build support', Boolean(editor?.windowsStandalone), editor?.windowsStandalone ? 'Installed' : 'Missing'),
     requirement('Official 3D URP template', Boolean(editor?.urpTemplate), editor?.urpTemplate ? 'Available' : 'Missing'),
   ].join('');
+  if (!report.hubAutoRegistration) elements.requirements.innerHTML += requirement('Automatic Hub registration (optional)', false, 'Hub 3.21.1+ required');
 
   elements.blockers.classList.toggle('hidden', report.blockers.length === 0);
   elements.blockers.innerHTML = report.blockers.map(item => `<p>${escapeHtml(item)}</p>`).join('');
@@ -212,6 +214,7 @@ elements.createAnother.addEventListener('click', () => {
   createdProject = null;
   document.querySelector('#hub-result').classList.add('hidden');
   retryHub.classList.add('hidden');
+  document.querySelector('#open-result-hub-button').classList.add('hidden');
   elements.projectName.value = '';
   elements.result.classList.add('hidden');
   elements.actionError.classList.add('hidden');
@@ -226,14 +229,24 @@ function renderHubResult(result) {
   element.className = `hub-result${result?.registered ? '' : ' pending'}`;
   element.textContent = result?.message || 'Hub registration has not been verified. Your project is ready to open.';
   retryHub.classList.toggle('hidden', Boolean(result?.registered));
+  retryHub.textContent = result?.requiresHubUpdate ? 'Recheck Hub and add project' : 'Retry adding to Unity Hub';
+  document.querySelector('#open-result-hub-button').classList.toggle('hidden', !environment?.hubInstalled);
 }
+
+document.querySelector('#open-result-hub-button').addEventListener('click', async () => {
+  if (!createdProject || busy || opening) return;
+  try { await invoke('launch_hub'); } catch (error) { showActionError(error); }
+});
 
 retryHub.addEventListener('click', async () => {
   if (!createdProject || busy || opening) return;
   busy = true;
   updateControls();
   document.querySelector('#hub-result').textContent = 'Adding the project to Unity Hub...';
-  try { renderHubResult(await invoke('register_project', { path: createdProject })); }
+  try {
+    renderHubResult(await invoke('register_project', { path: createdProject }));
+    try { renderEnvironment(await invoke('probe_environment')); } catch (error) { showActionError(error); }
+  }
   catch (error) { renderHubResult({ registered: false, message: String(error) }); }
   finally { busy = false; updateControls(); }
 });

@@ -11,6 +11,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use wait_timeout::ChildExt;
 
 const CDN: &str = "https://public-cdn.cloud.unity3d.com/hub/prod/cli";
+pub const MINIMUM_HUB_VERSION: &str = "3.21.1";
 static HUB_OPERATION: Mutex<()> = Mutex::new(());
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,6 +19,38 @@ static HUB_OPERATION: Mutex<()> = Mutex::new(());
 pub struct HubRegistration {
     pub registered: bool,
     pub message: String,
+    #[serde(default)]
+    pub requires_hub_update: bool,
+}
+
+pub fn detected_hub_version() -> Option<String> {
+    let path = dirs::config_dir()?.join("UnityHub/hubInfo.json");
+    let file = File::open(path).ok()?;
+    let info: Value = serde_json::from_reader(file.take(16384)).ok()?;
+    let version = info["version"].as_str()?;
+    if version.len() > 64 {
+        return None;
+    }
+    Some(version.to_owned())
+}
+
+pub fn supports_registration(version: Option<&str>) -> bool {
+    let Some(version) = version else {
+        return false;
+    };
+    let parts: Option<Vec<u32>> = version.split('.').map(|part| part.parse().ok()).collect();
+    matches!(parts.as_deref(), Some([major, minor, patch]) if (*major, *minor, *patch) >= (3, 21, 1))
+}
+
+fn compatibility_warning(version: Option<&str>) -> HubRegistration {
+    let installed = version
+        .map(|v| format!("Unity Hub {v}"))
+        .unwrap_or_else(|| "This Unity Hub version".into());
+    HubRegistration {
+        registered: false,
+        requires_hub_update: true,
+        message: format!("{installed} cannot be verified as compatible with automatic registration. Update and open Unity Hub {MINIMUM_HUB_VERSION} or newer, then recheck. Or use Hub's Add > Add project from disk and select the project folder above. Your Unity project is ready to open."),
+    }
 }
 
 #[derive(Deserialize)]
@@ -217,6 +250,20 @@ fn register(project: &Path, progress: &impl Fn(&str)) -> Result<(), String> {
 }
 
 pub fn register_project(project: &Path, progress: impl Fn(&str)) -> HubRegistration {
+    let version = detected_hub_version();
+    register_for_hub_version(project, progress, version.as_deref())
+}
+
+fn register_for_hub_version(
+    project: &Path,
+    progress: impl Fn(&str),
+    version: Option<&str>,
+) -> HubRegistration {
+    // Older Hubs read projects-v1.json; the current CLI writes hub.db instead.
+    // A CLI readback alone cannot prove registration with those desktop versions.
+    if !supports_registration(version) {
+        return compatibility_warning(version);
+    }
     let result = HUB_OPERATION
         .lock()
         .map_err(|_| "Another Hub operation failed.".to_owned())
@@ -224,10 +271,13 @@ pub fn register_project(project: &Path, progress: impl Fn(&str)) -> HubRegistrat
     match result {
         Ok(()) => HubRegistration {
             registered: true,
-            message: "Added to Unity Hub and verified.".into(),
+            requires_hub_update: false,
+            message: "Registered in Unity Hub's project database. Check Hub's Projects list."
+                .into(),
         },
         Err(message) => HubRegistration {
             registered: false,
+            requires_hub_update: false,
             message,
         },
     }
@@ -236,6 +286,34 @@ pub fn register_project(project: &Path, progress: impl Fn(&str)) -> HubRegistrat
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn hub_version_gate_rejects_legacy_unknown_and_prerelease_versions() {
+        for version in [
+            None,
+            Some("3.14.4"),
+            Some("3.20.1"),
+            Some("3.21.0"),
+            Some("3.21.1-beta.1"),
+            Some("3.21"),
+            Some("garbage"),
+        ] {
+            assert!(!supports_registration(version), "{version:?}");
+        }
+        assert!(supports_registration(Some("3.21.1")));
+        assert!(supports_registration(Some("3.21.2")));
+    }
+    #[test]
+    fn legacy_hub_cannot_report_registration_even_if_cli_could_succeed() {
+        let result = register_for_hub_version(
+            Path::new("not-a-project"),
+            |_| panic!("Legacy registration must stop before helper operations"),
+            Some("3.14.4"),
+        );
+        assert!(!result.registered);
+        assert!(result.requires_hub_update);
+        assert!(result.message.contains("3.14.4"));
+        assert!(result.message.contains("3.21.1"));
+    }
     #[test]
     fn manifest_pins_downloads() {
         let release: Release =

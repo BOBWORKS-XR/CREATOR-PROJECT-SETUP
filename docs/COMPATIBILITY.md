@@ -28,8 +28,9 @@ headset behavior, macOS/Linux execution, or multiplayer behavior.
 ## 0.2.0 Windows Preview Checks (2026-09-10)
 
 - `CreatorSetupSmoke-011`: fresh creation through the application's backend,
-  separate Unity reopen/validation, then automatic Hub registration. The CLI
-  listed the exact project path after adding it, before any interactive opening.
+  separate Unity reopen/validation, then CLI registration. The CLI listed the exact
+  project path after adding it. **This did not prove desktop Hub registration**;
+  see the 0.2.1 correction below.
 - `CreatorSetupRepair-003`: disposable copy with a missing required module and
   missing node database, plus a custom `System.Text.StringBuilder` type selection.
   Approved repair restored the module and generated 31,904 nodes, including 172
@@ -49,6 +50,29 @@ headset behavior, macOS/Linux execution, or multiplayer behavior.
   Windows binary matched the pinned size and SHA-256, and Hub verification passed.
 
 These checks cover the tested Windows/Unity recipe, not arbitrary existing
-projects. Hub registry readback is distinct from a running older Hub window
-refreshing its UI. Native macOS/Linux workflows and full player builds remain
+projects. CLI registry readback is distinct from desktop Hub compatibility and
+UI visibility. Native macOS/Linux workflows and full player builds remain
 unverified. No user-maintained project was repaired during these tests.
+
+## 0.2.1 Hub Compatibility Correction (2026-09-10)
+
+A user reproduced the missing-project issue in Hub 3.14.4 despite the successful
+CLI receipt. Read-only inspection found the project in the CLI's `hub.db` projects
+table but not in `projects-v1.json`. The installed Hub's `ProjectStorage` code
+confirmed it reads/writes the JSON store. This is a storage incompatibility, not
+merely a stale Hub window.
+
+The downloaded official Hub 3.21.1 installer was inspected without installing or
+executing it. Its distributed application code uses the same SQLite schema and
+`hub.db` path as the CLI and supports migration from the JSON store. No Unity
+implementation code was copied into this repository.
+
+Setup now gates CLI registration on detected Hub 3.21.1+ and reports unknown,
+older, or prerelease versions as requiring review/update. Creation and Open stay
+available. The retry refreshes Hub detection and never recreates the project.
+The success wording describes database registration, not observed UI visibility.
+
+Regression checks: 19 Rust unit tests and 16 frontend tests, including a legacy
+Hub failure gate that stops before any helper operation. Live native visibility
+after upgrading Hub remains an acceptance check; source compatibility alone is
+not recorded as a passed UI test.

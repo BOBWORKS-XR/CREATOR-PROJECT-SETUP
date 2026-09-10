@@ -1,6 +1,6 @@
-# Creator Project Setup 0.2.0 Preview
+# Creator Project Setup 0.2.1 Preview
 
-Run `Creator-Project-Setup-0.2.0-Windows.exe`. The portable app does not need to be
+Run `Creator-Project-Setup-0.2.1-Windows.exe`. The portable app does not need to be
 installed. It uses the Microsoft Edge WebView2 runtime; the setup EXE is available
 for machines that need that prerequisite installed.
 
@@ -8,9 +8,12 @@ For a new project, enter a name and parent folder. Setup checks the required Uni
 Editor, Android tools, Windows support, and URP template. Sign-in, licensing, and
 missing Unity installations still go through Unity Hub.
 
-After successful creation and validation, the project is added to Unity Hub
-automatically. A private official Unity CLI helper is downloaded once (about
-21 MB). Hub registration can be retried without recreating the project.
+Automatic registration requires Hub 3.21.1 or newer, opened at least once. With
+older Hub versions, use Add > Add project from disk, or update/open Hub and choose
+Recheck Hub and add project. Restarting an old Hub version alone is insufficient.
+A private official Unity CLI helper is downloaded once (about
+21 MB). Registration can be retried without recreating the project. The app checks
+the registration database, not whether a row is currently visible in Hub's window.
 
 For an existing project, choose **Existing project** and inspect the folder.
 Inspection does not change files. Close Unity, review the findings, and approve

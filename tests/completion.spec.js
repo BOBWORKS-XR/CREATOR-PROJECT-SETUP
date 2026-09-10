@@ -13,6 +13,7 @@ async function setup(page, options = {}) {
       window.calls.push({ command, args });
       if (command === 'probe_environment') return {
         platform: 'windows', ready: true, hubInstalled: true, unityCliInstalled: false,
+        hubVersion: window.options.legacyHub ? '3.14.4' : '3.21.1', hubAutoRegistration: !window.options.legacyHub,
         suggestedProjectParent: 'F:\\UnityTest', blockers: [],
         recipe: { editorVersion: '6000.3.21f1', creatorSdkVersion: '4.0.14', urpVersion: '17.3.0', inputSystemVersion: '1.20.0' },
         editors: [{ exactRecipe: true, androidPlayer: true, androidSdk: true, androidNdk: true, openJdk: true, windowsStandalone: true, urpTemplate: 'template.tgz' }],
@@ -20,9 +21,9 @@ async function setup(page, options = {}) {
       if (command === 'create_project') {
         if (window.options.pending) await new Promise(resolve => window.finishCreate = resolve);
         if (window.options.failCreate) throw 'Project already exists. No files were changed.';
-        return { success: true, projectPath: `${args.request.parentDirectory}\\${args.request.projectName}`, message: 'Project validated.', hub: { registered: !window.options.failHub, message: window.options.failHub ? 'Download failed. Your project is ready to open.' : 'Added to Unity Hub and verified.' } };
+        return { success: true, projectPath: `${args.request.parentDirectory}\\${args.request.projectName}`, message: 'Project validated.', hub: window.options.legacyHub ? { registered: false, requiresHubUpdate: true, message: 'Unity Hub 3.14.4 uses the old registry. Update to 3.21.1 or use Add > Add project from disk.' } : { registered: !window.options.failHub, message: window.options.failHub ? 'Download failed. Your project is ready to open.' : "Registered in Unity Hub's project database. Check Hub's Projects list." } };
       }
-      if (command === 'register_project') return { registered: true, message: 'Added to Unity Hub and verified.' };
+      if (command === 'register_project') return { registered: true, message: "Registered in Unity Hub's project database. Check Hub's Projects list." };
       if (command === 'inspect_project') return {
         projectPath: args.path, fingerprint: 'reviewed-files-sha256', canRepair: !window.options.blocked, canValidate: !window.options.blocked,
         findings: [{ status: window.options.blocked ? 'blocked' : 'repair', title: 'Visual Scripting setup', detail: window.options.blocked ? 'Project is open. Close Unity.' : 'Node database is missing.' }, { status: 'pass', title: 'Unity version', detail: '6000.3.21f1' }],
@@ -45,11 +46,30 @@ test('Hub failure preserves completed project and retry does not recreate it', a
   await expect(page.locator('#hub-result')).toContainText('Download failed');
   await expect(page.locator('#open-project-button')).toBeEnabled();
   await page.locator('#retry-hub-button').click();
-  await expect(page.locator('#hub-result')).toHaveText('Added to Unity Hub and verified.');
+  await expect(page.locator('#hub-result')).toContainText("Registered in Unity Hub's project database.");
   await expect(page.locator('#retry-hub-button')).toBeHidden();
   const calls = await page.evaluate(() => window.calls);
   expect(calls.filter(call => call.command === 'create_project')).toHaveLength(1);
   expect(calls.filter(call => call.command === 'register_project')).toHaveLength(1);
+});
+
+test('legacy Hub does not receive a green registration claim and update retry preserves project', async ({ page }, testInfo) => {
+  await setup(page, { legacyHub: true });
+  await expect(page.locator('#requirements')).toContainText('Hub 3.14.4');
+  await expect(page.locator('#requirements')).toContainText('Hub 3.21.1+ required');
+  await page.locator('#create-button').click();
+  await expect(page.locator('#hub-result')).toHaveClass('hub-result pending');
+  await expect(page.locator('#hub-result')).toContainText('3.14.4');
+  await expect(page.locator('#open-project-button')).toBeEnabled();
+  await expect(page.locator('#retry-hub-button')).toHaveText('Recheck Hub and add project');
+  await page.screenshot({ path: testInfo.outputPath('legacy-hub.png'), fullPage: true });
+  await page.locator('#open-result-hub-button').click();
+  expect(await page.evaluate(() => window.calls.filter(call => call.command === 'launch_hub').length)).toBe(1);
+  await page.evaluate(() => window.options.legacyHub = false);
+  await page.locator('#retry-hub-button').click();
+  await expect(page.locator('#hub-result')).toHaveClass('hub-result');
+  await expect(page.locator('#requirements')).toContainText('Hub 3.21.1');
+  expect(await page.evaluate(() => window.calls.filter(call => call.command === 'create_project').length)).toBe(1);
 });
 
 async function inspectExisting(page, options = {}) {
