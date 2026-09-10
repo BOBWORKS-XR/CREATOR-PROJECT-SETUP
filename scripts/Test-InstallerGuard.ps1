@@ -22,14 +22,25 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 public static class SetupGuardWindows {
+    public sealed class Observation {
+        public long Window;
+        public string Message;
+        public bool GuardDialog;
+        public int ButtonId;
+        public bool AcknowledgementAttempted;
+        public bool Posted;
+        public int Error;
+    }
     private delegate bool Visit(IntPtr h, IntPtr data);
     [DllImport("user32.dll")] private static extern bool EnumWindows(Visit cb, IntPtr data);
     [DllImport("user32.dll")] private static extern bool EnumChildWindows(IntPtr root, Visit cb, IntPtr data);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
     [DllImport("user32.dll", CharSet=CharSet.Unicode)] private static extern int GetWindowText(IntPtr h, StringBuilder text, int length);
-    [DllImport("user32.dll")] private static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
-    public static string Acknowledge(uint pid) {
-        string result = null;
+    [DllImport("user32.dll")] private static extern int GetDlgCtrlID(IntPtr h);
+    [DllImport("user32.dll")] private static extern IntPtr GetParent(IntPtr h);
+    [DllImport("user32.dll", SetLastError=true)] private static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+    public static Observation[] Inspect(uint pid, bool acknowledgeDialog) {
+        var result = new List<Observation>();
         EnumWindows((h, _) => {
             uint owner; GetWindowThreadProcessId(h, out owner);
             if (owner != pid) return true;
@@ -42,13 +53,22 @@ public static class SetupGuardWindows {
                 return true;
             }, IntPtr.Zero);
             var message = string.Join("\n", texts);
-            if (message.Contains("Setup will not force-close it.")) {
-                result = message;
-                if (acknowledge != IntPtr.Zero) PostMessage(acknowledge, 0xF5, IntPtr.Zero, IntPtr.Zero);
+            var observation = new Observation {
+                Window = h.ToInt64(), Message = message,
+                GuardDialog = message.Contains("Setup will not force-close it."),
+                ButtonId = acknowledge == IntPtr.Zero ? 0 : GetDlgCtrlID(acknowledge)
+            };
+            if (acknowledgeDialog && observation.GuardDialog && observation.ButtonId > 0 && observation.ButtonId <= 65535 && GetParent(acknowledge) == h) {
+                // BM_CLICK can fail on inactive dialogs. Send the matched OK
+                // control's BN_CLICKED notification using its observed ID.
+                observation.AcknowledgementAttempted = true;
+                observation.Posted = PostMessage(h, 0x111, new IntPtr(observation.ButtonId), acknowledge);
+                observation.Error = observation.Posted ? 0 : Marshal.GetLastWin32Error();
             }
+            result.Add(observation);
             return true;
         }, IntPtr.Zero);
-        return result;
+        return result.ToArray();
     }
 }
 '@
@@ -66,17 +86,25 @@ $owned = [Diagnostics.Process]::Start($psi)
 $fixtureError = $owned.StandardError.ReadToEndAsync()
 $run = $null
 $result = [ordered]@{ guardSha256=(Get-FileHash -LiteralPath $guard -Algorithm SHA256).Hash.ToLowerInvariant(); legacyExpected=[bool]$ExpectLegacyPage; passed=$false }
+$observations = [Collections.Generic.List[object]]::new()
+$seenObservations = [Collections.Generic.HashSet[string]]::new()
 try {
     $ready = $owned.StandardOutput.ReadLineAsync()
     if (-not $ready.Wait(10000) -or $ready.Result -ne 'ready') { throw 'Fixture process did not become ready.' }
     $result.fixturePid = $owned.Id
     if ($owned.HasExited) { throw 'Fixture exited before the installer test could start.' }
     $run = Start-Process -FilePath $exe -PassThru -WindowStyle Hidden
+    $result.installerFixturePid = $run.Id
     $dialog = $null
     $deadline = [DateTime]::UtcNow.AddSeconds(20)
     while (-not $run.HasExited -and [DateTime]::UtcNow -lt $deadline) {
-        $observed = [SetupGuardWindows]::Acknowledge($run.Id)
-        if ($observed) { $dialog = $observed }
+        $result.lastWindows = @([SetupGuardWindows]::Inspect($run.Id, $true))
+        foreach ($observed in $result.lastWindows) {
+            if ($observed.GuardDialog) {
+                $dialog = $observed.Message
+                if ($seenObservations.Add(($observed | ConvertTo-Json -Compress))) { $observations.Add($observed) }
+            }
+        }
         Start-Sleep -Milliseconds 100
     }
     if (-not $run.HasExited) { throw "Fixture did not exit; inspect only its PID $($run.Id). No process was killed." }
@@ -94,13 +122,28 @@ try {
     }
     if (-not $result.fixtureSurvived -or -not $result.existingProcessesSurvived) { throw 'A protected process exited during the test.' }
     $result.passed = $true
+} catch {
+    $result.failure = $_.Exception.Message
+    throw
 } finally {
+    $result.dialog = $dialog
+    $result.guardObservations = $observations.ToArray()
+    $result.legacyPageReached = Test-Path -LiteralPath $marker
+    $result.fixtureSurvived = -not $owned.HasExited
+    $result.existingProcessesSurvived = @($existing | Where-Object { -not (Get-Process -Id $_ -ErrorAction SilentlyContinue) }).Count -eq 0
+    if ($run) {
+        $result.installerFixtureExited = $run.HasExited
+        if ($run.HasExited) { $result.exitCode = $run.ExitCode }
+        else { $result.lastWindows = @([SetupGuardWindows]::Inspect($run.Id, $false)) }
+    }
     if (-not $owned.HasExited) { $owned.StandardInput.WriteLine('exit'); $owned.StandardInput.Close() }
-    if (-not $owned.WaitForExit(10000)) { throw "Owned fixture Node did not exit cooperatively: $($owned.Id)" }
-    $result.fixtureExitCode = $owned.ExitCode
+    $fixtureClosed = $owned.WaitForExit(10000)
+    if ($fixtureClosed) { $result.fixtureExitCode = $owned.ExitCode }
+    else { $result.cleanupFailure = "Owned fixture Node did not exit cooperatively: $($owned.Id)" }
     $result.fixtureStderr = if ($fixtureError.Wait(1000)) { $fixtureError.Result } else { 'stderr capture did not complete' }
     $owned.Dispose()
     if ($run -and $run.HasExited) { $run.Dispose() }
     $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $root 'report.json') -Encoding UTF8
     Write-Output (Join-Path $root 'report.json')
+    if (-not $fixtureClosed) { throw $result.cleanupFailure }
 }

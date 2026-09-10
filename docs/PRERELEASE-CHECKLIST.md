@@ -127,6 +127,16 @@ The no-install NSIS fixture confirms early refusal before the legacy selection
 page when a same-name process is running. It is **not** proof of an installed
 upgrade, settings migration, or a historical uninstaller's behavior.
 
+The guard harness records owned-dialog observations and process survival even on
+failure. It acknowledges only the matched warning's actual OK control, using its
+observed control ID and parent window. It does not assume IDOK=1: a captured
+Windows MB_OK dialog exposed ID 2. This uses the standard
+[WM_COMMAND control notification](https://learn.microsoft.com/en-us/windows/win32/menurc/wm-command)
+without activation; [BM_CLICK can fail for inactive dialogs](https://learn.microsoft.com/en-us/windows/win32/controls/bm-click).
+The old CI timeout did not retain sufficient dialog evidence to establish its
+cause. Three local runs of the revised harness passed with refusal code 10 and
+protected processes surviving; this is harness evidence, not a product change.
+
 Before distributing the installer, use a disposable Windows VM/profile and the
 exact public 0.2.2 installer, not a fabricated registry entry. Keep installer and
 installed EXE hashes, OS/user scope, exit codes, logs, and before/after snapshots.
