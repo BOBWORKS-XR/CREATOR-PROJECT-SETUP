@@ -33,14 +33,18 @@ Still required before promoting repair beyond preview: broader existing-project
 fixtures, recovery UX, third-party package callback coverage, and native
 macOS/Linux acceptance. Backups are selective; failure recovery is manual.
 
-## 0.3 - Optional Creator Works MCP
+## 0.3 - Optional Creator Hub Compatibility
 
-- Offer Creator Works MCP after the Unity project passes validation.
-- Keep MCP setup optional and independent from SDK correctness.
-- Verify the selected project and bridge version after setup.
-- Coordinate the reciprocal optional first-launch/manual Setup companion in
-  the MCP launcher. See [MCP-INTEGRATION.md](MCP-INTEGRATION.md); the initial
-  interface is an ordinary GUI launch and manual project selection, not IPC.
+- The approved [Creator Hub plan](CREATOR-HUB-PLAN.md) replaces reciprocal
+  installer prompts as the primary direction. Hub installs, opens and updates
+  independent tools; Setup remains fully usable without it.
+- Add pre-GUI, read-only app identity/version reporting with no project or
+  settings changes. Coordinate identical field names with Creator Works MCP.
+- Make Windows re-open focus the current GUI without losing its form or work.
+- Publish verified release descriptors in a later packaging pass so Hub can
+  compare installed and available versions independently of its own version.
+- Keep project handoff, bridge installation, native GUI embedding, and the
+  Coming Soon URP Converter outside the first compatibility change.
 
 ## Next Safety Pass
 

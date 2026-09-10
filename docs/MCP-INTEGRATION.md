@@ -4,7 +4,8 @@ Status: superseded as the primary direction by the approved optional Creator Hub
 approach. These companion notes remain useful constraints, but first-launch
 assistance should live in the Hub rather than be duplicated in every tool.
 The Windows Setup app remains independent. Hub compatibility belongs to the
-next version; the published 0.2.2 files remain unchanged.
+next version; the published 0.2.2 files remain unchanged. The governing plan and
+shared metadata contract are in [CREATOR-HUB-PLAN.md](CREATOR-HUB-PLAN.md).
 
 ## First Pass
 

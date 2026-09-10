@@ -181,6 +181,8 @@ required for SDK correctness.
 The coordinated [MCP integration notes](docs/MCP-INTEGRATION.md) now point toward
 an optional Creator Hub for installing, opening, and updating independent tools.
 Hub compatibility is next-version work, not a feature of the 0.2.2 download.
+See the [approved Creator Hub plan](docs/CREATOR-HUB-PLAN.md) for app ownership,
+the metadata contract, update discovery, installation safeguards and release gates.
 
 ## License
 
