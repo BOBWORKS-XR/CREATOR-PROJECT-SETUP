@@ -42,7 +42,7 @@ $report = [ordered]@{
     installedUpgradeTested = $false; guiStartupTested = $false; guiNormalCloseTested = $false
     settingsEvidence = 'Synthetic sentinels only. No project, repair receipt or real user preferences were created.'
     notTested = @('Unity/project creation or repair', 'Interactive installer UI', 'Busy project creation',
-        'Historical uninstaller', 'Hub adoption or self-update', 'macOS/Linux', 'Clean candidate provenance')
+        'Historical uninstaller', 'Hub adoption or self-update', 'macOS/Linux')
 }
 function Require($Condition, [string]$Message) { if (-not $Condition) { throw $Message } }
 function Hash([string]$Path) { (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant() }
@@ -97,6 +97,8 @@ try {
     $candidate = Get-Content -LiteralPath (Join-Path $candidateRoot 'candidate-report.json') -Raw | ConvertFrom-Json
     Require ($candidate.sourceRevision -ceq $pin.sourceRevision -and $candidate.version -ceq $version -and $candidate.artifactChecksPassed) 'Candidate report does not match the pinned tested source.'
     $report.candidateSourceDirty = $candidate.sourceDirty
+    Require (-not $candidate.sourceDirty) 'Only a source-clean final candidate may pass this release acceptance.'
+    Require ($candidate.checks.packagedLicenseNotices -and $candidate.checks.portableZipVerified) 'Candidate has no verified license-complete packaging evidence.'
     $report.installerSha256 = Hash $installer
     $report.executableSha256 = Hash $payload
     $baseline = Join-Path $output 'baseline-0.2.2.exe'
@@ -144,6 +146,10 @@ try {
     Require ((Hash $installedExe) -ceq $pin.executableSha256) 'Updated installed EXE differs from extracted candidate payload.'
     Require ((Get-ItemProperty -LiteralPath $uninstallKey).DisplayVersion -ceq $version) 'Registry version did not advance.'
     Require ((Get-Item -LiteralPath $productKey).GetValue('') -eq $installRoot) 'Updated registration path changed.'
+    foreach ($notice in $candidate.notices.files) {
+        Require ((Hash (Join-Path $installRoot $notice.name)) -ceq $notice.sha256) "Installed license notice differs from candidate: $($notice.name)"
+    }
+    $report.installedLicenseNoticesVerified = $true
     foreach ($sentinel in $sentinelHashes) { Require ((Hash $sentinel.path) -ceq $sentinel.hash) "Preservation sentinel changed: $($sentinel.path)" }
     [IO.File]::WriteAllText((Join-Path $output 'after-upgrade.json'), (Snapshot))
     $identity = & node -e "const v=require(process.argv[1]); console.log(JSON.stringify(v.probe(process.argv[2],process.argv[3])));" (Join-Path $PSScriptRoot 'verify-windows-candidate.cjs') $installedExe $version

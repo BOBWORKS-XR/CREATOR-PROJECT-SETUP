@@ -65,6 +65,14 @@ Windows build tools can rewrite line endings without a Git content difference.
 Regression tests still reject staged, unstaged, deleted and untracked source.
 Historical reports are not changed retroactively.
 
+The licence-complete candidate from source
+`4ba97911ce135faa2f1ea495dd01bf1ea0c1f55d` passed
+[Windows Candidate run 34527681202](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34527681202).
+Its report records `sourceDirty:false`, verified installer/portable ZIP notice
+payloads (299 Rust dependencies), and successful native/browser/guard checks.
+Installed acceptance is pinned to that run without rebuilding. The pin is a test
+input, not proof the installed acceptance has passed.
+
 Identity protocol 1 is derived only from the exact native metadata/rejection
 checks. Lifecycle and installer protocols remain 0. Minimum planned Hub version
 is `0.1.0-alpha.3`. The unsigned descriptor contains no hosting extension.

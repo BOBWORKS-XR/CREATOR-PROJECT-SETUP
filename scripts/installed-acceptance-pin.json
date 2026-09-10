@@ -1,10 +1,10 @@
 {
   "repository": "BOBWORKS-XR/CREATOR-PROJECT-SETUP",
-  "runId": "34521606644",
-  "sourceRevision": "f2756fa2f39efdfc3db2e5db71b2d3b5e6bae173",
+  "runId": "34527681202",
+  "sourceRevision": "4ba97911ce135faa2f1ea495dd01bf1ea0c1f55d",
   "version": "0.3.0-alpha.1",
-  "installerSha256": "e2274847b51962c69b27f888714d9dbdd5c1d59e804d8f9ed517b6a4e1b3f04d",
-  "executableSha256": "409dc782d72c628cce439c57949fe961ec4c5db042a130e44b36cb677e481ecd",
+  "installerSha256": "0fdef05fa42fb88cb4bba4929d87065d5114a202c8c2d59ddb3672dbab99f3be",
+  "executableSha256": "e160787c2e5e1ff0012e2e0aa74ecfa516434e05d2c255f6d11340724690e6f0",
   "baselineUrl": "https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/download/v0.2.2/Creator-Project-Setup-0.2.2-Windows-setup.exe",
   "baselineSha256": "b3f9ed80e9319c4ce7339836310bbfbf7342da665fef155937a5701eda2229e5",
   "baselineExecutableSha256": "23006194bd8214b92c980dc1042466d598d6d1daaed26819ab697d67159db49b"
