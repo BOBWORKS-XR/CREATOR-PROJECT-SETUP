@@ -21,7 +21,10 @@ jobs:
             label: Linux
             args: --bundles appimage,deb,rpm
           - os: macos-latest
-            label: macOS
+            label: macOS Apple silicon
+            args: --bundles dmg
+          - os: macos-15-intel
+            label: macOS Intel
             args: --bundles dmg
     runs-on: ${{ matrix.os }}
     steps:
@@ -31,6 +34,9 @@ jobs:
           node-version: 22
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
       - name: Install Linux Tauri dependencies
         if: runner.os == 'Linux'
         run: |
