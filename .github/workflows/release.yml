@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Package ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: Windows
+            args: --bundles nsis
+          - os: ubuntu-22.04
+            label: Linux
+            args: --bundles appimage,deb,rpm
+          - os: macos-latest
+            label: macOS
+            args: --bundles dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux Tauri dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            libxdo-dev \
+            libssl-dev \
+            librsvg2-dev \
+            patchelf \
+            build-essential \
+            file \
+            rpm
+      - run: npm ci
+      - run: npm run check
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NO_STRIP: 1
+        with:
+          projectPath: .
+          tagName: ${{ github.ref_name }}
+          releaseName: Creator Project Setup __VERSION__
+          releaseBody: Portable Creator SDK Unity project setup. Windows is the first physically tested platform; macOS and Linux are preview packages until their Unity workflows receive native acceptance testing.
+          releaseDraft: true
+          prerelease: true
+          args: ${{ matrix.args }}
