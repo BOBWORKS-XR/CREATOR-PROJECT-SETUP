@@ -128,7 +128,7 @@ installer, updater, single-instance behavior, or project handoff.
 - Windows release-subsystem EXE returned one 198-byte UTF-8 JSON line, exit 0,
   and empty stderr; version/platform/architecture matched its build.
 - Process tests used isolated configuration/cache directories and confirmed
-  they remained empty. Extra, repeated and unknown Hub arguments returned exit
+  they remained empty. Extra, repeated, case-invalid and unknown Hub arguments returned exit
   2, empty stdout, and no generated files within the five-second test bound.
 - 27 unit tests and two executable integration tests passed; four opt-in live
   Unity/Hub tests remained excluded. All 21 frontend tests and Clippy passed.

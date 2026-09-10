@@ -13,10 +13,12 @@ pub fn startup_mode(arguments: impl IntoIterator<Item = OsString>) -> StartupMod
     let arguments: Vec<_> = arguments.into_iter().collect();
     if arguments.len() == 1 && arguments[0] == "--creator-hub-info" {
         StartupMode::Info
-    } else if arguments
-        .iter()
-        .any(|argument| argument.to_string_lossy().starts_with("--creator-hub"))
-    {
+    } else if arguments.iter().any(|argument| {
+        argument
+            .to_string_lossy()
+            .to_ascii_lowercase()
+            .starts_with("--creator-hub")
+    }) {
         StartupMode::Invalid
     } else {
         StartupMode::Standalone
@@ -68,6 +70,9 @@ mod tests {
             vec!["--creator-hub-info=true"],
             vec!["--creator-hub-install"],
             vec!["--creator-hub"],
+            vec!["--CREATOR-HUB-INFO"],
+            vec!["--Creator-Hub-Info"],
+            vec!["--CREATOR-HUB-UNKNOWN"],
         ] {
             assert_eq!(mode(&arguments), StartupMode::Invalid);
         }

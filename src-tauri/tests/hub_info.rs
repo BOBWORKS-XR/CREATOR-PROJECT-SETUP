@@ -70,6 +70,9 @@ fn malformed_metadata_invocations_exit_without_gui_or_writes() {
         vec!["--creator-hub-info=true"],
         vec!["--creator-hub-install"],
         vec!["--creator-hub"],
+        vec!["--CREATOR-HUB-INFO"],
+        vec!["--Creator-Hub-Info"],
+        vec!["--CREATOR-HUB-UNKNOWN"],
         vec!["anything", "--creator-hub-info"],
     ] {
         let output = run_metadata(&arguments);
