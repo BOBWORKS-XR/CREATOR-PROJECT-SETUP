@@ -1,6 +1,6 @@
 [package]
 name = "creator-project-setup"
-version = "0.1.0"
+version = "0.1.1"
 description = "Creator SDK Unity project setup and validation"
 authors = ["Creator Works"]
 edition = "2021"

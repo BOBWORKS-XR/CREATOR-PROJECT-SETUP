@@ -47,13 +47,17 @@
         <div class="recipe-line" id="recipe-line">Loading approved recipe…</div>
 
         <button id="create-button" class="primary-button" type="button" disabled>Create and validate project</button>
-        <button id="open-project-button" class="secondary-button full-width hidden" type="button">Open project in Unity</button>
+        <button id="open-project-button" class="primary-button hidden" type="button">Open project in Unity</button>
+        <button id="create-another-button" class="text-button full-width hidden" type="button">Create another project</button>
 
         <div id="activity" class="activity hidden" aria-live="polite">
           <div class="activity-header"><span class="spinner"></span><strong id="activity-title">Preparing project</strong></div>
           <p id="activity-message">Unity may take several minutes while packages resolve and compile.</p>
+          <ol id="progress-steps" class="progress-steps" aria-label="Setup stages"></ol>
+          <span id="elapsed-time" class="elapsed-time"></span>
         </div>
         <div id="result" class="result hidden" aria-live="polite"></div>
+        <div id="action-error" class="result hidden" role="alert"></div>
       </section>
 
       <section class="requirements-pane" aria-labelledby="requirements-heading">
@@ -81,7 +85,7 @@
   </main>
 
   <footer>
-    <span>Creator Project Setup 0.1.0</span>
+    <span>Creator Project Setup 0.1.1</span>
     <button id="sdk-source-button" class="text-button" type="button">Creator SDK source</button>
   </footer>
   <script src="app.js"></script>

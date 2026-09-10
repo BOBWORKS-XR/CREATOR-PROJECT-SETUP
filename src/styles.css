@@ -107,7 +107,14 @@ button { border: 0; border-radius: 5px; color: #eef4f5; }
 .activity { border-left-color: var(--cyan); }
 .activity-header { display: flex; align-items: center; gap: 9px; }
 .activity p { margin: 8px 0 0; color: var(--muted); }
+.activity { overflow-wrap: anywhere; }
+.progress-steps { padding-left: 20px; color: var(--muted); margin: 14px 0; }
+.progress-steps li { padding: 2px 0; }
+.progress-steps .done { color: var(--green); }
+.progress-steps .current { color: var(--cyan); font-weight: 700; }
+.elapsed-time { color: var(--muted); font-variant-numeric: tabular-nums; }
 .result.success { border-left-color: var(--green); }
+.result { overflow-wrap: anywhere; }
 .result strong { color: #fff; }
 .spinner { width: 13px; height: 13px; border: 2px solid #526167; border-top-color: var(--cyan); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

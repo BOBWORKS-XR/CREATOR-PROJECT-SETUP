@@ -3,6 +3,7 @@
 mod logic;
 
 use logic::{CreateRequest, CreationResult, EnvironmentReport, Recipe};
+use tauri::Emitter;
 use tauri_plugin_dialog::DialogExt;
 
 #[tauri::command]
@@ -25,10 +26,17 @@ fn pick_parent_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
-async fn create_project(request: CreateRequest) -> Result<CreationResult, String> {
-    tauri::async_runtime::spawn_blocking(move || logic::create_project(request))
-        .await
-        .map_err(|error| format!("Setup worker failed: {error}"))?
+async fn create_project(
+    app: tauri::AppHandle,
+    request: CreateRequest,
+) -> Result<CreationResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        logic::create_project(request, |progress| {
+            let _ = app.emit("setup-progress", progress);
+        })
+    })
+    .await
+    .map_err(|error| format!("Setup worker failed: {error}"))?
 }
 
 #[tauri::command]

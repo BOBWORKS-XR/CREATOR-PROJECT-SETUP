@@ -8,6 +8,8 @@
 - Pinned Creator SDK registry installation.
 - Android active by default, with Android and Windows support both mandatory.
 - Batch compilation and a local receipt.
+- Initialize Creator Visual Scripting and validate it in a second Editor session.
+- Real setup stages and elapsed time; explicit completion/Open/Create another states.
 - macOS/Linux packaging and detection preview.
 
 ## 0.2 - Repair Mode
@@ -26,6 +28,10 @@
 ## Later
 
 - Tested macOS and Linux installation workflows.
+- Register successful projects in Unity Hub through a supported, version-checked
+  interface. Prefer the official Unity CLI registry commands where available;
+  preserve a usable project and report manual fallback if registration fails.
+  Never rewrite Hub's private project database or silently link Unity Cloud.
 - Signed/notarized packages.
 - SideQuest-maintained compatibility recipe feed with integrity metadata.
 - Safe SDK upgrades with preview, backup, rollback, and migration checks.

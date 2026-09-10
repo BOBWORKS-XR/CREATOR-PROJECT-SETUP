@@ -1,14 +1,16 @@
 {
   "name": "creator-project-setup",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Portable Creator SDK Unity project setup and validation",
   "scripts": {
     "dev": "tauri dev",
     "build": "tauri build",
-    "check": "cargo test --release --manifest-path src-tauri/Cargo.toml"
+    "check": "cargo test --release --manifest-path src-tauri/Cargo.toml",
+    "test:ui": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tauri-apps/cli": "^2.8.5"
   }
 }

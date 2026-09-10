@@ -4,10 +4,10 @@ use serde_json::{json, Value};
 use std::env;
 use std::ffi::OsStr;
 use std::fs::{self, File};
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tar::Archive;
 use wait_timeout::ChildExt;
 
@@ -113,6 +113,21 @@ pub struct CreationResult {
     pub log_path: String,
     pub receipt_path: String,
     pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SetupProgress {
+    pub step: u8,
+    pub detail: String,
+}
+
+impl SetupProgress {
+    fn new(step: u8, detail: impl Into<String>) -> Self {
+        Self {
+            step,
+            detail: detail.into(),
+        }
+    }
 }
 
 pub fn recipe() -> Recipe {
@@ -507,65 +522,95 @@ fn update_project_name(project: &Path, project_name: &str) -> Result<(), String>
 }
 
 fn validation_script() -> String {
-    format!(
-        r#"using System;
-using System.IO;
-using UnityEditor;
-using UnityEngine;
-using UnityEngine.Rendering;
+    include_str!("ProjectSetupValidator.cs")
+        .replace("@@EDITOR_VERSION@@", EDITOR_VERSION)
+        .replace("@@CREATOR_SDK_VERSION@@", CREATOR_SDK_VERSION)
+        .replace("@@URP_VERSION@@", URP_VERSION)
+        .replace("@@INPUT_SYSTEM_VERSION@@", INPUT_SYSTEM_VERSION)
+}
 
-namespace CreatorWorks
-{{
-    public static class ProjectSetupValidator
-    {{
-        [Serializable]
-        private sealed class Result
-        {{
-            public bool success;
-            public string unityVersion;
-            public string creatorSdkVersion;
-            public string urpVersion;
-            public string inputSystemVersion;
-            public bool urpConfigured;
-            public bool androidSupported;
-            public bool windowsSupported;
-            public string checkedAtUtc;
-        }}
+fn unity_progress(target: &Path, log: &Path, step: u8) -> Option<SetupProgress> {
+    let progress_path = target.join(".creator-project-setup/unity-progress.json");
+    if let Ok(file) = File::open(progress_path) {
+        if let Ok(progress) = serde_json::from_reader::<_, SetupProgress>(file.take(4096)) {
+            if progress.step >= step && progress.step <= 5 {
+                return Some(progress);
+            }
+        }
+    }
+    let mut file = File::open(log).ok()?;
+    let length = file.metadata().ok()?.len();
+    file.seek(SeekFrom::Start(length.saturating_sub(32768)))
+        .ok()?;
+    let mut bytes = Vec::new();
+    file.take(32768).read_to_end(&mut bytes).ok()?;
+    let text = String::from_utf8_lossy(&bytes);
+    text.lines().rev().find_map(|line| {
+        let asset = line
+            .strip_prefix("Start importing ")?
+            .split(" using Guid(")
+            .next()?;
+        Some(SetupProgress::new(
+            step,
+            format!("Importing {}", asset.chars().take(220).collect::<String>()),
+        ))
+    })
+}
 
-        public static void Validate()
-        {{
-            var package = UnityEditor.PackageManager.PackageInfo.FindForPackageName("com.sidequest.creator-sdk");
-            var urpPackage = UnityEditor.PackageManager.PackageInfo.FindForPackageName("com.unity.render-pipelines.universal");
-            var inputPackage = UnityEditor.PackageManager.PackageInfo.FindForPackageName("com.unity.inputsystem");
-            var result = new Result
-            {{
-                unityVersion = Application.unityVersion,
-                creatorSdkVersion = package == null ? "missing" : package.version,
-                urpVersion = urpPackage == null ? "missing" : urpPackage.version,
-                inputSystemVersion = inputPackage == null ? "missing" : inputPackage.version,
-                urpConfigured = GraphicsSettings.defaultRenderPipeline != null,
-                androidSupported = BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Android, BuildTarget.Android),
-                windowsSupported = BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Standalone, BuildTarget.StandaloneWindows64),
-                checkedAtUtc = DateTime.UtcNow.ToString("O")
-            }};
-            result.success = result.unityVersion == "{EDITOR_VERSION}"
-                && result.creatorSdkVersion == "{CREATOR_SDK_VERSION}"
-                && result.urpVersion == "{URP_VERSION}"
-                && result.inputSystemVersion == "{INPUT_SYSTEM_VERSION}"
-                && result.urpConfigured
-                && result.androidSupported
-                && result.windowsSupported;
-            var root = Directory.GetParent(Application.dataPath).FullName;
-            var folder = Path.Combine(root, ".creator-project-setup");
-            Directory.CreateDirectory(folder);
-            File.WriteAllText(Path.Combine(folder, "unity-validation.json"), JsonUtility.ToJson(result, true));
-            AssetDatabase.SaveAssets();
-            EditorApplication.Exit(result.success ? 0 : 2);
-        }}
-    }}
-}}
-"#
-    )
+fn run_unity(
+    editor: &str,
+    target: &Path,
+    method: &str,
+    log: &Path,
+    step: u8,
+    progress: &impl Fn(SetupProgress),
+) -> Result<(), String> {
+    let mut child = Command::new(editor)
+        .args(["-batchmode", "-nographics", "-projectPath"])
+        .arg(target)
+        .args([
+            "-buildTarget",
+            "Android",
+            "-executeMethod",
+            method,
+            "-logFile",
+        ])
+        .arg(log)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|error| format!("Cannot launch Unity: {error}"))?;
+    let started = Instant::now();
+    let mut last = None;
+    let exit = loop {
+        match child.wait_timeout(Duration::from_secs(1)) {
+            Ok(None) if started.elapsed() < Duration::from_secs(30 * 60) => {
+                if let Some(update) = unity_progress(target, log, step) {
+                    if last.as_ref() != Some(&update) {
+                        progress(update.clone());
+                        last = Some(update);
+                    }
+                }
+            }
+            result => break result,
+        }
+    };
+    match exit {
+        Ok(Some(status)) if status.success() => Ok(()),
+        Ok(Some(_)) => Err(format!(
+            "Unity setup failed. Review {}. The project was preserved.",
+            log.display()
+        )),
+        result => {
+            let _ = child.kill();
+            let _ = child.wait();
+            Err(format!(
+                "Unity setup did not finish ({result:?}). Review {}. The project was preserved.",
+                log.display()
+            ))
+        }
+    }
 }
 
 fn write_receipt(project: &Path, value: &Value) -> Result<PathBuf, String> {
@@ -580,7 +625,14 @@ fn write_receipt(project: &Path, value: &Value) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-pub fn create_project(request: CreateRequest) -> Result<CreationResult, String> {
+pub fn create_project(
+    request: CreateRequest,
+    progress: impl Fn(SetupProgress),
+) -> Result<CreationResult, String> {
+    progress(SetupProgress::new(
+        1,
+        "Checking project path and required Unity modules.",
+    ));
     let project_name = request.project_name.trim();
     validate_project_name(project_name)?;
     let parent = PathBuf::from(request.parent_directory.trim());
@@ -615,6 +667,10 @@ pub fn create_project(request: CreateRequest) -> Result<CreationResult, String> 
 
     fs::create_dir(&target).map_err(|error| format!("Cannot create project folder: {error}"))?;
     let setup = (|| -> Result<CreationResult, String> {
+        progress(SetupProgress::new(
+            2,
+            "Extracting the official URP template and adding the pinned Creator SDK.",
+        ));
         extract_project_template(&template, &target)?;
         fs::write(
             target.join("ProjectSettings/ProjectVersion.txt"),
@@ -650,39 +706,33 @@ pub fn create_project(request: CreateRequest) -> Result<CreationResult, String> 
             }),
         )?;
 
-        let mut child = Command::new(&editor.executable)
-            .args(["-batchmode", "-quit", "-nographics", "-projectPath"])
-            .arg(&target)
-            .args([
-                "-buildTarget",
-                "Android",
-                "-executeMethod",
-                "CreatorWorks.ProjectSetupValidator.Validate",
-                "-logFile",
-            ])
-            .arg(&log_path)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(|error| format!("Cannot launch Unity: {error}"))?;
-
-        let exit = child
-            .wait_timeout(Duration::from_secs(30 * 60))
-            .map_err(|error| format!("Cannot wait for Unity: {error}"))?;
-        let status = match exit {
-            Some(status) => status,
-            None => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(format!(
-                    "Unity setup exceeded 30 minutes. The project and log were preserved at {}.",
-                    target.display()
-                ));
-            }
-        };
+        progress(SetupProgress::new(
+            3,
+            "Unity is resolving packages, importing assets and compiling scripts.",
+        ));
+        run_unity(
+            &editor.executable,
+            &target,
+            "CreatorWorks.ProjectSetupValidator.Configure",
+            &log_path,
+            3,
+            &progress,
+        )?;
+        let reopen_log = status_folder.join("unity-reopen-validation.log");
+        progress(SetupProgress::new(
+            5,
+            "Reopening Unity to check persisted settings, Creator nodes and build platforms.",
+        ));
+        run_unity(
+            &editor.executable,
+            &target,
+            "CreatorWorks.ProjectSetupValidator.Validate",
+            &reopen_log,
+            5,
+            &progress,
+        )?;
         let validation_path = status_folder.join("unity-validation.json");
-        if !status.success() || !validation_path.is_file() {
+        if !validation_path.is_file() {
             return Err(format!(
                 "Unity did not validate the project. Review {}. The partial project was preserved.",
                 log_path.display()
@@ -716,12 +766,16 @@ pub fn create_project(request: CreateRequest) -> Result<CreationResult, String> 
                 "logPath": log_path
             }),
         )?;
+        progress(SetupProgress::new(
+            6,
+            "Validation passed. Project is ready to open.",
+        ));
         Ok(CreationResult {
             success: true,
             project_path: target.to_string_lossy().to_string(),
             log_path: log_path.to_string_lossy().to_string(),
             receipt_path: receipt_path.to_string_lossy().to_string(),
-            message: "Creator SDK project compiled and passed the baseline checks.".into(),
+            message: "Creator SDK project compiled, initialized Visual Scripting, and passed checks after reopening.".into(),
         })
     })();
 
@@ -790,6 +844,37 @@ mod tests {
     }
 
     #[test]
+    fn validator_requires_visual_scripting_after_reopen() {
+        let script = validation_script();
+        assert!(!script.contains("@@"));
+        assert!(script.contains(
+            "result.visualScriptingInitialized && result.creatorVisualScriptingConfigured"
+        ));
+        assert!(script.contains("result.creatorNodeCount > 0"));
+        assert!(script.contains("EditorApplication.delayCall += FinishConfiguration"));
+    }
+
+    #[test]
+    fn progress_is_bounded_and_reopen_ignores_old_stage() {
+        let root = env::temp_dir().join(format!("creator-progress-test-{}", std::process::id()));
+        let folder = root.join(".creator-project-setup");
+        fs::create_dir_all(&folder).unwrap();
+        let log = folder.join("unity.log");
+        fs::write(&log, "Start importing Assets/Example.mat using Guid(123)\n").unwrap();
+        assert_eq!(
+            unity_progress(&root, &log, 3).unwrap().detail,
+            "Importing Assets/Example.mat"
+        );
+        let status = folder.join("unity-progress.json");
+        fs::write(&status, r#"{"step":4,"detail":"Generating nodes"}"#).unwrap();
+        assert_eq!(unity_progress(&root, &log, 3).unwrap().step, 4);
+        assert_eq!(unity_progress(&root, &log, 5).unwrap().step, 5);
+        fs::write(&status, "{").unwrap();
+        assert_eq!(unity_progress(&root, &log, 3).unwrap().step, 3);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn rejects_unsafe_project_names() {
         for name in [
             "",
@@ -846,10 +931,13 @@ mod tests {
             .expect("set CREATOR_SETUP_SMOKE_PARENT to an existing disposable test directory");
         let name =
             env::var("CREATOR_SETUP_SMOKE_NAME").unwrap_or_else(|_| "CreatorSetupSmoke".into());
-        let result = create_project(CreateRequest {
-            project_name: name,
-            parent_directory: parent,
-        })
+        let result = create_project(
+            CreateRequest {
+                project_name: name,
+                parent_directory: parent,
+            },
+            |progress| println!("progress: {} {}", progress.step, progress.detail),
+        )
         .expect("real Unity setup should succeed");
         assert!(result.success);
         assert!(Path::new(&result.receipt_path).is_file());
