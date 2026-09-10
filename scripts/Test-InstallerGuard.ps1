@@ -58,14 +58,19 @@ $psi.UseShellExecute = $false
 $psi.CreateNoWindow = $true
 $psi.RedirectStandardInput = $true
 $psi.RedirectStandardOutput = $true
-$psi.Arguments = '-e "process.stdin.once(''data'',()=>process.exit(0));process.stdout.write(''ready\n'')"'
+$psi.RedirectStandardError = $true
+# Keep this owned fake app alive independently of stdin readiness, until the
+# harness sends its exact release marker.
+$psi.Arguments = '-e "const hold=setInterval(()=>{},1000);let input='''';process.stdin.setEncoding(''utf8'');process.stdin.on(''data'',chunk=>{input+=chunk;if(input.trim()===''exit''){clearInterval(hold);process.exit(0)}});process.stdout.write(''ready\n'')"'
 $owned = [Diagnostics.Process]::Start($psi)
+$fixtureError = $owned.StandardError.ReadToEndAsync()
 $run = $null
 $result = [ordered]@{ guardSha256=(Get-FileHash -LiteralPath $guard -Algorithm SHA256).Hash.ToLowerInvariant(); legacyExpected=[bool]$ExpectLegacyPage; passed=$false }
 try {
     $ready = $owned.StandardOutput.ReadLineAsync()
     if (-not $ready.Wait(10000) -or $ready.Result -ne 'ready') { throw 'Fixture process did not become ready.' }
     $result.fixturePid = $owned.Id
+    if ($owned.HasExited) { throw 'Fixture exited before the installer test could start.' }
     $run = Start-Process -FilePath $exe -PassThru -WindowStyle Hidden
     $dialog = $null
     $deadline = [DateTime]::UtcNow.AddSeconds(20)
@@ -81,6 +86,7 @@ try {
     $result.dialog = $dialog
     $result.fixtureSurvived = -not $owned.HasExited
     $result.existingProcessesSurvived = @($existing | Where-Object { -not (Get-Process -Id $_ -ErrorAction SilentlyContinue) }).Count -eq 0
+    if (-not $result.fixtureSurvived) { throw 'Fake app exited unexpectedly; installer refusal cannot be evaluated.' }
     if ($ExpectLegacyPage) {
         if (-not $result.legacyPageReached -or $result.exitCode -ne 0) { throw 'Baseline did not reach the legacy page.' }
     } elseif ($result.legacyPageReached -or $result.exitCode -ne 10 -or -not $dialog) {
@@ -91,6 +97,8 @@ try {
 } finally {
     if (-not $owned.HasExited) { $owned.StandardInput.WriteLine('exit'); $owned.StandardInput.Close() }
     if (-not $owned.WaitForExit(10000)) { throw "Owned fixture Node did not exit cooperatively: $($owned.Id)" }
+    $result.fixtureExitCode = $owned.ExitCode
+    $result.fixtureStderr = if ($fixtureError.Wait(1000)) { $fixtureError.Result } else { 'stderr capture did not complete' }
     $owned.Dispose()
     if ($run -and $run.HasExited) { $run.Dispose() }
     $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $root 'report.json') -Encoding UTF8
