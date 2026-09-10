@@ -8,11 +8,13 @@
   <link rel="stylesheet" href="suite.css">
 </head>
 <body>
+  <div id="suite-dismiss" class="suite-dismiss" aria-hidden="true"></div>
+  <div id="suite-shell" class="suite-shell">
+  <div class="suite-brand" aria-hidden="true"><span>CREATOR</span> <strong>PROJECT</strong> SETUP</div>
   <button class="suite-trigger" id="suite-trigger" type="button" aria-expanded="false" aria-controls="suite-menu" aria-label="Open Creator apps" title="Creator apps">
     <span class="suite-mark"><img src="creator-works-logo.png" alt=""><span class="suite-letter">P</span></span>
   </button>
-  <nav id="suite-menu" class="suite-menu hidden" aria-label="Creator apps">
-    <div class="suite-menu-heading"><span>Creator apps</span><button id="suite-close" class="icon-button" type="button" aria-label="Close Creator apps" title="Close"><span class="icon icon-close" aria-hidden="true"></span></button></div>
+  <nav id="suite-menu" class="suite-menu" aria-label="Creator apps" aria-hidden="true" inert>
     <button class="suite-item" type="button" data-suite-link="hub">
       <span class="suite-mark hub-mark"><img src="creator-works-logo.png" alt=""><span class="suite-letter">H</span></span>
       <span class="suite-item-copy"><strong>Creator Hub</strong><small>In development</small></span><span class="icon icon-external" aria-hidden="true"></span>
@@ -25,9 +27,11 @@
       <span class="suite-mark"><img src="creator-works-logo.png" alt=""><span class="suite-letter">P</span></span>
       <span class="suite-item-copy"><strong>Project Setup</strong><small>Current app</small></span><span class="suite-current-dot" aria-hidden="true"></span>
     </button>
-    <div class="suite-item unavailable"><span class="suite-future-mark" aria-hidden="true">U</span><span class="suite-item-copy"><strong>URP Converter</strong><small>Coming soon</small></span></div>
+    <div class="suite-item unavailable"><span class="suite-mark converter-mark"><img src="sidequest-mark-white.svg" alt=""><span class="suite-letter">C</span></span><span class="suite-item-copy"><strong>Creator Converter</strong><small>SideQuest / Coming soon</small></span></div>
+    <div class="suite-item unavailable"><span class="suite-mark"><span class="icon icon-plugins" aria-hidden="true"></span></span><span class="suite-item-copy"><strong>Creator Plugins</strong><small>Community / Coming soon</small></span></div>
     <p id="suite-error" class="suite-error hidden" role="status"></p>
   </nav>
+  </div>
   <header class="app-header">
     <div class="title-block">
       <h1 class="brand-name"><span>CREATOR</span> <strong>PROJECT</strong> SETUP</h1>

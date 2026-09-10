@@ -1,5 +1,9 @@
 const invoke = window.__TAURI__.core.invoke;
 
+window.__TAURI__.event.listen('creator-lifecycle-close-blocked', () => {
+  showActionError('Setup is still working. Wait for the operation to finish before closing it.');
+}).catch(() => {});
+
 const elements = {
   overall: document.querySelector('#overall-status'),
   projectName: document.querySelector('#project-name'),

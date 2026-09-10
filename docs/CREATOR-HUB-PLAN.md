@@ -8,11 +8,14 @@ its immutable downloads or claims Hub compatibility for that existing build.
 
 - Collapsible left navigation with a real menu toggle and icon tooltips.
 - Shared compact chrome: a protruding cube-logo tab without hamburger lines,
-  H/M/P corner badges, and a gray outer frame for Hub. Keep standalone navigation
+  H/M/P corner badges, and a gray isometric backplate for Hub. Keep standalone navigation
   until a trusted hosted-context contract exists; installation presence alone
   never changes how the UI behaves.
 - Creator Works MCP and Creator Project Setup show Install, Open, or Update.
-- URP Converter is Coming soon, with no fake install or download action.
+- SideQuest's Creator Converter is Coming soon, with no fake install or download action.
+- Creator Plugins is a future community directory, with no platform fees or
+  commission. GitHub/website submissions first; hosting, moderation and optional
+  SideQuest account integration remain decisions, not implemented capabilities.
 - Flat tool detail pages, installed/available versions, download progress, and
   visible failures. No account, subscription, always-running service, or Unity
   Editor bundled in Hub.
@@ -58,7 +61,7 @@ Required fields:
 ```
 
 Stable app IDs: `creator-project-setup`, `creator-works-mcp`. Reserve
-`creator-urp-converter` but do not publish a supported entry yet. Platform names
+`creator-converter` but do not publish a supported entry yet. Platform names
 are `windows`, `macos`, `linux`; architectures are `x86_64`, `aarch64` for the
 initial catalog. Version is the actual compiled SemVer, not a hard-coded feed
 value. Ignore additional metadata fields, reject unsupported schema versions,
@@ -127,7 +130,7 @@ Background downloading is opt-in; installation is a separate explicit action.
    signature/hash failures, disk full, newer installed version, preview channels,
    running MCP server, and repeated Open with preserved GUI state.
 6. Later: a shared project picker and hosted tool interfaces, only if useful.
-   Player emulation is outside this plan; URP remains Coming soon.
+   Player emulation is outside this plan; Creator Converter remains Coming soon.
 
 ## Interface Pass: 2026-09-10
 
@@ -157,3 +160,24 @@ blocked-GUI tests before adding the capability. Use a narrow reviewed solution,
 not an expanding custom IPC framework.
 
 Source reviewed: [Tauri single-instance Windows implementation](https://github.com/tauri-apps/plugins-workspace/blob/v2/plugins/single-instance/src/platform_impl/windows.rs).
+
+## Install Manager Pass: 2026-09-10
+
+The local Hub now implements verified Windows downloads, public-release update
+checks, signed descriptor verification, install/open/adoption actions, progress,
+cancellation and explicit update consent. Legacy installers use their normal
+window because their silent path may force-close running apps. No seamless
+legacy restart claim is made. Future descriptors must be published and signed
+with the Hub catalog key before a new app is an authorized update.
+
+Setup keeps native operation guards alive inside its asynchronous Unity workers,
+refuses close/exit while busy and rejects new work once closing begins. Its new
+installer/uninstaller refuses running-app replacement rather than force-killing
+the app. It cannot change an already-installed old uninstaller. Source/race tests
+are not native end-to-end installer acceptance; retain protocol zero until the
+respective production GUI/package tests pass.
+
+Remaining gates: clean-VM native install/upgrade, signed descriptor publication,
+catalog-key backup/recovery and platform-specific acceptance. Creator Plugins
+hosting is undecided; GitHub Pages, Bonto and an owner-operated server are
+candidates only. Community listings must remain separate from trusted updates.

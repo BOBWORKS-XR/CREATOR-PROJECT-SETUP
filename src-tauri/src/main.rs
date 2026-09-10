@@ -3,25 +3,29 @@
 mod creator_hub;
 mod hub;
 mod hub_restart;
+mod lifecycle;
 mod logic;
 mod repair;
 
 use logic::{CreateRequest, CreationResult, EnvironmentReport, Recipe};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 #[tauri::command]
-fn get_recipe() -> Recipe {
-    logic::recipe()
+fn get_recipe() -> Result<Recipe, String> {
+    let _operation = lifecycle::LIFECYCLE.command()?;
+    Ok(logic::recipe())
 }
 
 #[tauri::command]
-fn probe_environment() -> EnvironmentReport {
-    logic::probe_environment()
+fn probe_environment() -> Result<EnvironmentReport, String> {
+    let _operation = lifecycle::LIFECYCLE.command()?;
+    Ok(logic::probe_environment())
 }
 
 #[tauri::command]
 fn pick_parent_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    let _operation = lifecycle::LIFECYCLE.command()?;
     Ok(app
         .dialog()
         .file()
@@ -34,7 +38,9 @@ async fn create_project(
     app: tauri::AppHandle,
     request: CreateRequest,
 ) -> Result<CreationResult, String> {
+    let operation = lifecycle::LIFECYCLE.command()?;
     tauri::async_runtime::spawn_blocking(move || {
+        let _operation = operation;
         logic::create_project(request, |progress| {
             let _ = app.emit("setup-progress", progress);
         })
@@ -45,17 +51,21 @@ async fn create_project(
 
 #[tauri::command]
 fn open_project(path: String) -> Result<(), String> {
+    let _operation = lifecycle::LIFECYCLE.command()?;
     logic::open_project(&path)
 }
 
 #[tauri::command]
 fn launch_hub() -> Result<(), String> {
+    let _operation = lifecycle::LIFECYCLE.command()?;
     logic::launch_hub()
 }
 
 #[tauri::command]
 async fn restart_hub(app: tauri::AppHandle) -> Result<bool, String> {
+    let operation = lifecycle::LIFECYCLE.command()?;
     tauri::async_runtime::spawn_blocking(move || {
+        let _operation = operation;
         let approved = app.dialog()
             .message("Fully close and reopen Unity Hub to reload its Projects list?\n\nWait for Hub downloads and installations to finish first. Unity Editors and project files will not be closed or changed. If Hub refuses to close, the restart stops without force-closing it.")
             .title("Restart Unity Hub?")
@@ -70,7 +80,9 @@ async fn restart_hub(app: tauri::AppHandle) -> Result<bool, String> {
 
 #[tauri::command]
 async fn register_project(path: String) -> Result<hub::HubRegistration, String> {
+    let operation = lifecycle::LIFECYCLE.command()?;
     tauri::async_runtime::spawn_blocking(move || {
+        let _operation = operation;
         hub::register_project(std::path::Path::new(&path), |_| {})
     })
     .await
@@ -79,9 +91,13 @@ async fn register_project(path: String) -> Result<hub::HubRegistration, String> 
 
 #[tauri::command]
 async fn inspect_project(path: String) -> Result<repair::Inspection, String> {
-    tauri::async_runtime::spawn_blocking(move || repair::inspect(std::path::Path::new(&path)))
-        .await
-        .map_err(|e| e.to_string())?
+    let operation = lifecycle::LIFECYCLE.command()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _operation = operation;
+        repair::inspect(std::path::Path::new(&path))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -89,7 +105,9 @@ async fn run_existing_project(
     app: tauri::AppHandle,
     request: repair::ExistingRequest,
 ) -> Result<repair::ExistingResult, String> {
+    let operation = lifecycle::LIFECYCLE.command()?;
     tauri::async_runtime::spawn_blocking(move || {
+        let _operation = operation;
         repair::run(request, |progress| {
             let _ = app.emit("existing-progress", progress);
         })
@@ -100,6 +118,7 @@ async fn run_existing_project(
 
 #[tauri::command]
 fn open_official_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    let _operation = lifecycle::LIFECYCLE.command()?;
     let allowed = [
         "https://unity.com/download",
         "https://docs.unity.com/en-us/unity-cli/use-unity-cli",
@@ -149,6 +168,23 @@ fn main() {
     }
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            #[cfg(windows)]
+            if let Some(window) = app.get_webview_window("main") {
+                lifecycle::LIFECYCLE.attach(window.hwnd()?.0 as usize);
+            }
+            Ok(())
+        })
+        .on_window_event(|window, event| match event {
+            tauri::WindowEvent::CloseRequested { api, .. } => {
+                if !lifecycle::LIFECYCLE.request_close() {
+                    api.prevent_close();
+                    let _ = window.emit("creator-lifecycle-close-blocked", ());
+                }
+            }
+            tauri::WindowEvent::Destroyed => lifecycle::LIFECYCLE.detach(),
+            _ => {}
+        })
         .invoke_handler(tauri::generate_handler![
             get_recipe,
             probe_environment,
@@ -162,6 +198,13 @@ fn main() {
             run_existing_project,
             open_official_url
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Creator Project Setup");
+        .build(tauri::generate_context!())
+        .expect("error while running Creator Project Setup")
+        .run(|_, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                if !lifecycle::LIFECYCLE.request_close() {
+                    api.prevent_exit();
+                }
+            }
+        });
 }

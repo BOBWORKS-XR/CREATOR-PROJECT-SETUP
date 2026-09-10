@@ -30,6 +30,7 @@
     "shortDescription": "Create and validate SideQuest Creator SDK Unity projects",
     "longDescription": "Portable setup wizard for a pinned Unity, URP, build-module, and SideQuest Creator SDK project recipe",
     "targets": "all",
+    "windows": { "nsis": { "installerHooks": "windows/installer-hooks.nsh" } },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

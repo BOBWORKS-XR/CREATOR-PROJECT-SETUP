@@ -1,6 +1,8 @@
 (() => {
   const trigger = document.querySelector('#suite-trigger');
   const menu = document.querySelector('#suite-menu');
+  const shell = document.querySelector('#suite-shell');
+  const dismiss = document.querySelector('#suite-dismiss');
   const error = document.querySelector('#suite-error');
   const links = Object.freeze({
     hub: 'https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/blob/master/docs/CREATOR-HUB-PLAN.md',
@@ -9,28 +11,34 @@
   const items = () => [...menu.querySelectorAll('button:not(:disabled)')];
   const isOpen = () => trigger.getAttribute('aria-expanded') === 'true';
   function close(restoreFocus = false) {
-    menu.classList.add('hidden');
+    if (restoreFocus || menu.contains(document.activeElement)) trigger.focus({ preventScroll: true });
+    shell.classList.remove('suite-expanded');
+    document.body.classList.remove('suite-open');
+    menu.inert = true;
+    menu.setAttribute('aria-hidden', 'true');
     trigger.setAttribute('aria-expanded', 'false');
     trigger.setAttribute('aria-label', 'Open Creator apps');
-    if (restoreFocus) trigger.focus();
   }
   trigger.addEventListener('click', () => {
     if (isOpen()) return close(true);
-    menu.classList.remove('hidden');
+    shell.classList.add('suite-expanded');
+    document.body.classList.add('suite-open');
+    menu.inert = false;
+    menu.setAttribute('aria-hidden', 'false');
     trigger.setAttribute('aria-expanded', 'true');
     trigger.setAttribute('aria-label', 'Close Creator apps');
-    menu.querySelector('button.suite-item')?.focus();
+    menu.querySelector('button.suite-item')?.focus({ preventScroll: true });
   });
-  document.querySelector('#suite-close').addEventListener('click', () => close(true));
   document.querySelector('#suite-current').addEventListener('click', () => close(true));
+  dismiss.addEventListener('click', () => close(true));
   document.addEventListener('keydown', event => {
     if (isOpen() && event.key === 'Escape') { event.preventDefault(); close(true); }
   });
   document.addEventListener('pointerdown', event => {
-    if (isOpen() && !menu.contains(event.target) && !trigger.contains(event.target)) close();
+    if (isOpen() && event.target !== dismiss && !shell.contains(event.target)) close();
   });
   document.addEventListener('focusin', event => {
-    if (isOpen() && !menu.contains(event.target) && !trigger.contains(event.target)) close();
+    if (isOpen() && !shell.contains(event.target)) close();
   });
   menu.addEventListener('keydown', event => {
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
@@ -39,7 +47,7 @@
     const current = buttons.indexOf(document.activeElement);
     const index = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
       : (current + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
-    buttons[index]?.focus();
+    buttons[index]?.focus({ preventScroll: true });
   });
   for (const button of menu.querySelectorAll('[data-suite-link]')) {
     button.addEventListener('click', async () => {

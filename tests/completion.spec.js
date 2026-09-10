@@ -337,9 +337,9 @@ test('app switcher supports keyboard, outside dismissal and bounded links', asyn
   await expect(trigger).toBeFocused();
   await expect(page.locator('#suite-menu')).toBeHidden();
   await trigger.click();
-  await page.locator('#project-name').click();
+  await page.locator('#suite-dismiss').click({ position: { x: 600, y: 180 } });
   await expect(page.locator('#suite-menu')).toBeHidden();
-  await expect(page.locator('#project-name')).toBeFocused();
+  await expect(trigger).toBeFocused();
   await trigger.click();
   await page.keyboard.press('End');
   await expect(page.locator('#suite-current')).toBeFocused();
@@ -374,8 +374,86 @@ for (const width of [980, 720, 560, 390]) {
     await page.screenshot({ path: testInfo.outputPath('setup.png'), fullPage: true });
     await page.locator('#suite-trigger').click();
     await expect(page.locator('#suite-menu')).toBeVisible();
+    await expect(page.locator('#suite-shell')).toHaveCSS('width', '224px');
+    await expect(page.locator('#suite-shell')).toHaveCSS('height', '352px');
+    await expect(page.locator('.app-header .title-block')).toHaveCSS('opacity', '0');
+    await expect(page.locator('.suite-brand')).toHaveCSS('opacity', '1');
+    await expect(page.locator('.suite-brand')).toHaveCSS('visibility', 'visible');
+    expect(await page.locator('.suite-brand').evaluate(el => el.getBoundingClientRect().x)).toBe(15);
+    expect(await page.locator('#suite-shell').evaluate(el => el.scrollLeft)).toBe(0);
     await page.screenshot({ path: testInfo.outputPath('switcher.png'), fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     expect(errors).toEqual([]);
   });
 }
+
+test('drawer morphs from the tab without moving page content', async ({ page }, testInfo) => {
+  await setup(page);
+  const bounds = await page.locator('#create-button').boundingBox();
+  const closed = await page.locator('#suite-trigger').boundingBox();
+  await page.locator('#suite-trigger').click();
+  await expect(page.locator('#suite-shell')).toHaveCSS('width', '224px');
+  await expect(page.locator('#suite-shell')).toHaveCSS('height', '352px');
+  await expect(page.locator('.app-header .title-block')).toHaveCSS('opacity', '0');
+  const expanded = await page.locator('#suite-trigger').boundingBox();
+  expect(expanded.x - closed.x).toBe(169);
+  expect(expanded.y).toBe(closed.y);
+  expect(await page.locator('#create-button').boundingBox()).toEqual(bounds);
+  expect(await page.locator('#suite-shell').evaluate(el => el.scrollTop)).toBe(0);
+  await expect(page.locator('#suite-close')).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('expanded-drawer.png'), fullPage: true });
+  await page.locator('#suite-trigger').click();
+  await expect(page.locator('#suite-menu')).toBeHidden();
+  await expect(page.locator('#suite-menu')).toHaveJSProperty('inert', true);
+  await expect(page.locator('#suite-shell')).toHaveCSS('width', '55px');
+  await expect(page.locator('.app-header .title-block')).toHaveCSS('opacity', '1');
+  await expect(page.locator('#suite-trigger')).toBeFocused();
+});
+
+test('drawer transitions reverse and reduced motion removes animation', async ({ page }) => {
+  await setup(page);
+  const properties = await page.evaluate(async () => {
+    document.querySelector('#suite-trigger').click();
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const shell = document.querySelector('#suite-shell');
+    const transitions = shell.getAnimations().map(animation => animation.transitionProperty);
+    document.querySelector('#suite-trigger').click();
+    document.querySelector('#suite-trigger').click();
+    document.querySelector('#suite-trigger').click();
+    return transitions;
+  });
+  expect(properties).toContain('width');
+  expect(properties).toContain('height');
+  await expect(page.locator('#suite-shell')).toHaveCSS('width', '55px');
+  await expect(page.locator('#suite-menu')).toHaveJSProperty('inert', true);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.locator('#suite-trigger').click();
+  await expect(page.locator('#suite-shell')).toHaveCSS('transition-duration', '0s');
+  await expect(page.locator('#suite-shell')).toHaveCSS('width', '224px');
+  await expect(page.locator('.app-header .title-block')).toHaveCSS('opacity', '0');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#suite-menu')).toBeHidden();
+});
+
+test('short drawer can scroll to its last entry without moving the logo', async ({ page }) => {
+  await page.setViewportSize({ width: 560, height: 240 });
+  await setup(page);
+  await page.locator('#suite-trigger').click();
+  await expect(page.locator('#suite-shell')).toHaveCSS('height', '216px');
+  await expect(page.locator('#suite-shell')).toHaveCSS('width', '224px');
+  const before = await page.locator('#suite-trigger').boundingBox();
+  await page.locator('#suite-menu').evaluate(el => el.scrollTop = el.scrollHeight);
+  const last = await page.locator('.suite-item.unavailable').last().boundingBox();
+  expect(last.y + last.height).toBeLessThanOrEqual(228);
+  expect(await page.locator('#suite-trigger').boundingBox()).toEqual(before);
+});
+
+test('click-away cannot activate the create button behind the drawer', async ({ page }) => {
+  await setup(page);
+  const button = await page.locator('#create-button').boundingBox();
+  await page.locator('#suite-trigger').click();
+  await expect(page.locator('#suite-shell')).toHaveCSS('width', '224px');
+  await page.mouse.click(button.x + button.width - 15, button.y + button.height / 2);
+  await expect(page.locator('#suite-menu')).toBeHidden();
+  expect(await page.evaluate(() => window.calls.some(call => call.command === 'create_project'))).toBe(false);
+});
