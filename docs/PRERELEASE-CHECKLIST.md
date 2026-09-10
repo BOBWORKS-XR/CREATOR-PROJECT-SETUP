@@ -70,8 +70,13 @@ The licence-complete candidate from source
 [Windows Candidate run 34527681202](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34527681202).
 Its report records `sourceDirty:false`, verified installer/portable ZIP notice
 payloads (299 Rust dependencies), and successful native/browser/guard checks.
-Installed acceptance is pinned to that run without rebuilding. The pin is a test
-input, not proof the installed acceptance has passed.
+Installed acceptance reused that run without rebuilding and passed in
+[run 34528338440](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34528338440).
+The public 0.2.2 default per-user installation upgraded successfully after a
+blocked attempt preserved byte-identical file/data/registry snapshots. The owned
+process exited cooperatively; installed EXE/licence hashes, synthetic sentinels,
+and real app-window startup/normal close passed. This approves only the guarded
+default-path NSIS update route, not historical uninstallers or general migration.
 
 Identity protocol 1 is derived only from the exact native metadata/rejection
 checks. Lifecycle and installer protocols remain 0. Minimum planned Hub version
@@ -151,9 +156,9 @@ installed EXE hashes, OS/user scope, exit codes, logs, and before/after snapshot
 
 | Scenario | Required evidence | Current gate |
 | --- | --- | --- |
-| Fresh install and standalone launch | Installed identity matches extracted hash; normal GUI opens; uninstall registration correct | Not run |
-| Closed 0.2.2 to candidate | Legitimate preferences and project receipts preserved; no duplicate installation | Not run |
-| Running 0.2.2 upgrade, GUI and silent | Refuses before invoking old uninstaller; old process survives; no changed files/registration | Not run |
+| Fresh install and standalone launch | Installed identity matches extracted hash; normal GUI opens; uninstall registration correct | Candidate standalone launch passed after upgrade; isolated fresh-candidate install remains a Hub suite gate |
+| Closed 0.2.2 to candidate | Legitimate preferences and project receipts preserved; no duplicate installation | Default-path upgrade passed with synthetic sentinels; real preferences/receipts untested |
+| Running 0.2.2 upgrade, GUI and silent | Refuses before invoking old uninstaller; old process survives; no changed files/registration | Owned same-name process refusal and unchanged snapshots passed; real busy app untested |
 | Candidate busy creating/repairing | Upgrade and uninstall refuse; operation and Editor survive | Not run |
 | Cancelled/failed upgrade | Prior app remains usable; no false success or deleted settings | Not run |
 | Portable plus installed copies/custom location | Explicit selection; unrelated copies and content untouched | Not run |

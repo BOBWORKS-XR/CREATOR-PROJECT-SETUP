@@ -38,6 +38,11 @@ receipt. Native installed tests cover public 0.2.2 upgrading to this prerelease,
 active-app refusal, unchanged refusal snapshots, cooperative exit, installed hashes,
 synthetic preservation sentinels, and real main-window startup and normal close.
 
+[Candidate checks](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34527681202)
+and [installed upgrade acceptance](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34528338440)
+passed for these exact files. Native regression tests: 35 passed, with four
+explicit live Unity/Hub tests not run. Browser interface tests: 32 passed.
+
 These checks do not establish migration of real user settings or project receipts,
 historical uninstaller safety, busy Unity creation/repair, full Hub adoption,
 headset behavior, published multiplayer spaces, or native macOS/Linux acceptance.
