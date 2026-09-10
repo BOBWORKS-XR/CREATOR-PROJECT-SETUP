@@ -6,12 +6,15 @@ use std::io::Write;
 pub enum StartupMode {
     Standalone,
     Info,
+    Hosted,
     Invalid,
 }
 
 pub fn startup_mode(arguments: impl IntoIterator<Item = OsString>) -> StartupMode {
     let arguments: Vec<_> = arguments.into_iter().collect();
-    if arguments.len() == 1 && arguments[0] == "--creator-hub-info" {
+    if arguments.len() == 1 && arguments[0] == "--creator-hub-host" {
+        StartupMode::Hosted
+    } else if arguments.len() == 1 && arguments[0] == "--creator-hub-info" {
         StartupMode::Info
     } else if arguments.iter().any(|argument| {
         argument

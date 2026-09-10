@@ -53,7 +53,7 @@
     button.addEventListener('click', async () => {
       error.classList.add('hidden');
       try {
-        await window.__TAURI__.core.invoke('open_official_url', { url: links[button.dataset.suiteLink] });
+        await window.CreatorRuntime.invoke('open_official_url', { url: links[button.dataset.suiteLink] });
       } catch (reason) {
         error.textContent = `Could not open the link: ${String(reason)}`;
         error.classList.remove('hidden');

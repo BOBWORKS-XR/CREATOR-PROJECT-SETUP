@@ -15,3 +15,17 @@
     Abort
   ${EndIf}
 !macroend
+
+; The reinstall page may run a legacy uninstaller before the install section.
+; Refuse that path before displaying any installer page, not only before copying.
+!ifdef MUI_CUSTOMFUNCTION_GUIINIT
+  !error "Review existing GUI initialization before adding Setup preflight"
+!endif
+!define MUI_CUSTOMFUNCTION_GUIINIT CreatorSetupEarlyPreflight
+Function CreatorSetupEarlyPreflight
+  Push $0
+  Push $1
+  !insertmacro CheckIfAppIsRunning "creator-project-setup.exe" "Creator Project Setup"
+  Pop $1
+  Pop $0
+FunctionEnd

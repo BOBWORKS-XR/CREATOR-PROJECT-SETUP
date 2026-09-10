@@ -227,6 +227,9 @@ mod windows {
         }
         if processes(&executable)?.is_empty() {
             std::process::Command::new(&executable)
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
                 .spawn()
                 .map_err(|e| {
                     format!("Hub closed but could not reopen: {e}. Use Open Unity Hub to retry.")

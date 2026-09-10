@@ -1,17 +1,47 @@
 # Creator Hub: Approved Direction
 
-Decision: 2026-09-10. Creator Hub is an optional, lightweight install/open/update
-front door. Creator Project Setup 0.2.2 has shipped publicly; none of this changes
-its immutable downloads or claims Hub compatibility for that existing build.
+## Hosted Setup Preview Implemented
+
+The current local development pair runs Setup's actual UI inside Hub, with its
+own windowless native backend and shared standalone commands. Windows acceptance
+confirms real requirements, native picking, retained forms and busy-close guards.
+See the sibling Hub repository's `docs/HOSTING-PROTOCOL-PREVIEW.md` for source,
+exact tested hashes, native reports and remaining adoption/shortcut/state-transfer
+gates. Setup 0.2.2 remains unchanged; no installed user app was replaced.
+
+The MCP owning task has supplied a tested read-only hosting slice. Its writable
+lifecycle, cross-command leases and safe disconnect recovery remain separate
+acceptance gates. Hub and MCP changes are coordinated with their owning task.
+
+Release audit 2026-09-10: real isolated repair and a second validation passed,
+including preserved scene/custom content/VS selections and a retained backup.
+Hub cold/warm single-instance launches also passed, but that is navigation only,
+not completed standalone adoption. The Setup installer now checks running apps
+before displaying the legacy-uninstaller page. A no-install native A/B test
+proved early refusal with no process termination. The rebuilt installer still
+requires clean installed-upgrade acceptance before publication.
+
+Decision corrected by the user: 2026-09-10. Creator Hub is an optional, lightweight
+host containing the installed Creator apps in one window, not a launcher for
+separate app windows. It adopts their existing installations and settings.
+Creator Project Setup 0.2.2 has shipped publicly; none of this changes its immutable
+downloads or claims hosting compatibility for that existing build.
 
 ## Product Boundary
 
 - Collapsible left navigation with a real menu toggle and icon tooltips.
 - Shared compact chrome: a protruding cube-logo tab without hamburger lines,
-  H/M/P corner badges, and a gray isometric backplate for Hub. Keep standalone navigation
-  until a trusted hosted-context contract exists; installation presence alone
-  never changes how the UI behaves.
+  H/M/P corner badges, and a gray isometric backplate for Hub. Standalone apps
+  retain their menu when Hub is absent. Hosted apps use Hub's navigation instead,
+  after a verified handoff; folder presence or URL parameters are not sufficient.
 - Creator Works MCP and Creator Project Setup show Install, Open, or Update.
+- Hub setup detects existing Creator apps and asks to "Update and add to Hub".
+  Only approved apps receive necessary compatibility updates and adoption, using
+  existing settings and files. If none are found or the user chooses "Not now",
+  install Hub alone, with no automatic companion-app installation, shortcut
+  rerouting or changes to existing apps. Offer adoption again later on request.
+- A failed or cancelled update leaves that app unadopted and standalone. A
+  compatible app can be added without reinstalling it, with the same consent.
 - SideQuest's Creator Converter is Coming soon, with no fake install or download action.
 - Creator Plugins is a future community directory, with no platform fees or
   commission. GitHub/website submissions first; hosting, moderation and optional
@@ -22,19 +52,25 @@ its immutable downloads or claims Hub compatibility for that existing build.
 - Optional first-launch Unity/Creator SDK assistance belongs in Hub. Keep a
   permanent Setup action. Existing standalone users do not acquire a mandatory
   onboarding flow, another app copy, or changed settings.
-- Initial Open launches the normal standalone app, not an embedded EXE window.
-  Closing Hub must not close tools, Unity, or MCP server processes. A future
-  hosted interface should share the tool's implementation, not fork its logic.
+- Open displays the actual installed app interface inside Hub. Existing app
+  shortcuts route to that view once compatible adoption is established, without
+  a duplicate window, installation or settings copy. Hosted UI shares the tool's
+  implementation, not a second imitation. This is a first-release requirement.
+- Handoff waits for active operations and preserves selection/form/result state.
+  Closing or uninstalling Hub must not interrupt Unity, client-owned MCP servers
+  or pending app work. Apps retain a standalone fallback if Hub is unavailable.
 
 ## Ownership
 
-Hub owns the catalog, installed-app inventory, update comparison and user-approved
-download/install orchestration. Each tool owns its GUI, project operations,
-settings, lifecycle safeguards, and independently usable release. Unity Hub still
+Hub owns shared window/navigation, hosted-view lifecycle, adoption/shortcut routes,
+catalog, inventory and user-approved download/update orchestration. Each tool owns
+one reusable UI and backend, project operations, settings, safeguards and its
+independently usable release. A headless backend process is compatible with the
+one-visible-window requirement. Do not reparent foreign EXE windows. Unity Hub still
 owns Unity installation, accounts, licenses and build-module handoffs.
 
-The BANTWORKS MCP task owns MCP compatibility. This task owns Setup compatibility
-and the shared contract below. The URP converter remains separate work. Do not
+The Creator Works MCP task owns MCP compatibility. This task owns Setup compatibility
+and the shared contract below. Creator Converter remains separate work. Do not
 change its repository or promise compatibility before its owner agrees.
 
 ## Contract 1: Read-only Identity
@@ -92,11 +128,12 @@ Before automatic downloading/launching ships, establish catalog signing with a
 pinned public key, key recovery/rotation, bounded parsing, and rollback/replay
 policy. This is separate from paid Windows Authenticode or macOS notarization.
 
-Compare Semantic Versions, not strings or release dates. Ignore drafts and
-prereleases by default; preview is explicit opt-in. No downgrade of an installed
-newer version. Cache verified catalog data for offline use, show stale/failed
-checks honestly, and check at startup/on request rather than continuous polling.
-Background downloading is opt-in; installation is a separate explicit action.
+Compare Semantic Versions, not strings or release dates. Ignore drafts.
+Prereleases and verified background update downloads default to on for new Hub
+profiles; each can be disabled independently and saved choices are preserved.
+No downgrade of an installed newer version. Cache verified catalog data for
+offline use, show stale/failed checks honestly, and check at startup/on request
+rather than continuous polling. Installation is a separate explicit action.
 
 ## Installation Safety
 
@@ -122,17 +159,18 @@ Background downloading is opt-in; installation is a separate explicit action.
 2. In progress: next-version read-only metadata in Setup and MCP, with matching
    field names and automated/native tests. Reliable Windows re-open is a
    separate gate before either app advertises `launch.singleInstance`.
-3. Next: release descriptors, authenticated catalog and deterministic update
-   comparison tests; public assets must be downloadable without credentials.
-4. Next: minimal Hub install/open/update workflow and fake/offline fixture tests.
-   No shell-command execution from catalog data and no running-app replacement.
-5. Accept: fresh install, existing install adoption, cancellation, offline,
-   signature/hash failures, disk full, newer installed version, preview channels,
-   running MCP server, and repeated Open with preserved GUI state.
-6. Later: a shared project picker and hosted tool interfaces, only if useful.
+3. Next: minimum trusted hosted UI/backend contract, proven with Project Setup
+   working inside Hub using its existing code, settings, pickers and progress.
+4. Next: standalone-to-hosted adoption, shortcut routing, idle state-preserving
+   handoff and fallback. Apply the same contract to MCP with its owning task.
+5. Integrate the existing signed catalog/download/update work with hosted module
+   versions. No arbitrary command execution or running-app replacement.
+6. Accept: one window/one settings location, repeated/concurrent shortcut opens,
+   busy view switching/handoff, fallback, failure/offline/recovery, install/update,
+   signature/hash failures, older/newer versions and active MCP connections.
    Player emulation is outside this plan; Creator Converter remains Coming soon.
 
-## Interface Pass: 2026-09-10
+## Historical Interface Pass: 2026-09-10
 
 Setup and MCP now have coordinated next-version compact interfaces. Setup's
 creation fields collapse into a summary/progress view without changing the
@@ -161,7 +199,7 @@ not an expanding custom IPC framework.
 
 Source reviewed: [Tauri single-instance Windows implementation](https://github.com/tauri-apps/plugins-workspace/blob/v2/plugins/single-instance/src/platform_impl/windows.rs).
 
-## Install Manager Pass: 2026-09-10
+## Historical Install Manager Pass: 2026-09-10
 
 The local Hub now implements verified Windows downloads, public-release update
 checks, signed descriptor verification, install/open/adoption actions, progress,

@@ -409,6 +409,7 @@ dependencies = [
 name = "creator-project-setup"
 version = "0.3.0-alpha.1"
 dependencies = [
+ "base64 0.22.1",
  "dirs",
  "flate2",
  "reqwest",

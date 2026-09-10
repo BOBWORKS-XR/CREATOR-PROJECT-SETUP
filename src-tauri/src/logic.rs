@@ -823,6 +823,9 @@ pub fn open_project(path: &str) -> Result<(), String> {
     Command::new(editor.executable)
         .arg("-projectPath")
         .arg(project)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()
         .map_err(|error| format!("Cannot open Unity project: {error}"))?;
     Ok(())
@@ -839,6 +842,9 @@ pub fn launch_hub() -> Result<(), String> {
         Command::new(path)
     };
     command
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()
         .map_err(|error| format!("Cannot open Unity Hub: {error}"))?;
     Ok(())

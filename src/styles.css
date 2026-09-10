@@ -107,6 +107,9 @@ footer { display: flex; justify-content: space-between; align-items: center; fle
 .footer-links { display: flex; gap: 18px; flex-wrap: wrap; }
 footer .text-button { font-size: 11px; }
 .hidden { display: none !important; }
+.creator-hosted #suite-shell, .creator-hosted #suite-dismiss, .creator-hosted .title-block { display: none; }
+.creator-hosted .app-header { min-height: 28px; padding: 0 24px 4px; justify-content: flex-end; }
+.creator-hosted body { min-width: 0; }
 @media (max-width: 740px) {
   .workspace { grid-template-columns: 1fr; gap: 26px; }
   .app-header { align-items: flex-start; }

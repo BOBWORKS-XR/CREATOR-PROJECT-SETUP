@@ -11,8 +11,13 @@ been exercised on real machines.
 
 ## Download 0.2.2
 
-Development branch: `0.3.0-alpha.1` adds read-only Creator Hub identity and a
-compact shared app interface. See [the UI preview notes](docs/UI-PREVIEW.md).
+Development branch: `0.3.0-alpha.1` adds read-only Creator Hub identity, a compact
+shared interface and a local preview of Setup running inside Creator Hub. Real
+creation/reopen and isolated repair checks have passed. Installer preflight now
+also checks before the old-uninstaller selection page; full installed-upgrade
+acceptance is still pending. Persistent Hub adoption and standalone shortcut
+handoff are not yet implemented. See [the Hub plan](docs/CREATOR-HUB-PLAN.md) and
+[the UI preview notes](docs/UI-PREVIEW.md).
 These changes are not included in the stable download below.
 
 [Download the Windows portable EXE](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/download/v0.2.2/Creator-Project-Setup-0.2.2-Windows.exe)
@@ -175,7 +180,11 @@ npm run dev
 ```
 
 Build a native package with `npm run build`. Tagged builds are packaged for
-Windows, macOS, and Linux by GitHub Actions.
+Windows, macOS, and Linux by GitHub Actions. The separate Windows candidate
+workflow runs native/browser tests, checks the EXE extracted from the installer,
+and stages hashes and an unsigned Hub descriptor without publishing or installing.
+See the [prerelease checklist](docs/PRERELEASE-CHECKLIST.md) for commands and the
+installed-upgrade tests still required before distribution.
 
 ## Roadmap
 

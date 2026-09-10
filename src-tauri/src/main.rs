@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod creator_hub;
+mod hosted;
 mod hub;
 mod hub_restart;
 mod lifecycle;
@@ -42,7 +43,7 @@ async fn create_project(
     tauri::async_runtime::spawn_blocking(move || {
         let _operation = operation;
         logic::create_project(request, |progress| {
-            let _ = app.emit("setup-progress", progress);
+            hosted::emit(&app, "setup-progress", progress);
         })
     })
     .await
@@ -109,7 +110,7 @@ async fn run_existing_project(
     tauri::async_runtime::spawn_blocking(move || {
         let _operation = operation;
         repair::run(request, |progress| {
-            let _ = app.emit("existing-progress", progress);
+            hosted::emit(&app, "existing-progress", progress);
         })
     })
     .await
@@ -144,7 +145,15 @@ fn open_official_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
         command
     };
     let _ = app;
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000);
+    }
     command
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .spawn()
         .map_err(|error| format!("Cannot open link: {error}"))?;
     Ok(())
@@ -152,7 +161,8 @@ fn open_official_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
 
 fn main() {
     // Metadata queries must never initialize the GUI or touch project settings.
-    match creator_hub::startup_mode(std::env::args_os().skip(1)) {
+    let startup = creator_hub::startup_mode(std::env::args_os().skip(1));
+    match startup {
         creator_hub::StartupMode::Info => {
             if let Err(error) = creator_hub::write_info(std::io::stdout().lock()) {
                 eprintln!("Creator Hub metadata failed: {error}");
@@ -164,11 +174,23 @@ fn main() {
             eprintln!("Use --creator-hub-info alone; no other Hub arguments are supported.");
             std::process::exit(2);
         }
-        creator_hub::StartupMode::Standalone => {}
+        creator_hub::StartupMode::Standalone | creator_hub::StartupMode::Hosted => {}
     }
+    let mut context = tauri::generate_context!();
+    let files = if startup == creator_hub::StartupMode::Hosted {
+        context.config_mut().app.windows.clear();
+        Some(hosted::assets(&context).expect("Cannot decode hosted Setup interface"))
+    } else {
+        None
+    };
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .setup(|app| {
+        .setup(move |app| {
+            if let Some(files) = files {
+                app.manage(hosted::Output::default());
+                let handle = app.handle().clone();
+                std::thread::spawn(move || hosted::run(handle, files));
+            }
             #[cfg(windows)]
             if let Some(window) = app.get_webview_window("main") {
                 lifecycle::LIFECYCLE.attach(window.hwnd()?.0 as usize);
@@ -198,7 +220,7 @@ fn main() {
             run_existing_project,
             open_official_url
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while running Creator Project Setup")
         .run(|_, event| {
             if let tauri::RunEvent::ExitRequested { api, .. } = event {

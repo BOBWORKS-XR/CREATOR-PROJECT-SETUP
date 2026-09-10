@@ -1,0 +1,99 @@
+# Windows 0.3.0-alpha.1 Candidate
+
+This is preparation for a coordinated prerelease, not publication approval.
+Stable 0.2.2 remains unchanged. The candidate does not advertise installed hosting,
+shortcut adoption, SDK migration, or unattended installation.
+
+## Candidate Workflow
+
+`Windows Candidate` runs tests and stages unsigned Windows x64 artifacts with
+read-only repository permissions. It does not create tags/releases, upload release
+assets, load signing keys, or execute the product installer/uninstaller.
+Branch pushes to `hub-compatibility` can test it before merging. Manual dispatch
+requires the workflow to exist on the default branch, per
+[GitHub's workflow documentation](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
+Do not push this preparation branch until publication coordination approves it.
+
+Run locally from PowerShell 7 after installing the repository dependencies:
+
+```powershell
+$env:CARGO_TARGET_DIR = "$PWD\dist\prerelease-target"
+node --test scripts/verify-windows-candidate.test.cjs
+cargo test --release --locked --manifest-path src-tauri/Cargo.toml
+npx playwright test --output dist/candidate-ui-tests
+./scripts/Build-WindowsCandidate.ps1
+```
+
+Use a dedicated target directory; do not reuse another task's active build.
+The build script saves the portable EXE **before** NSIS bundling. It then uses
+7-Zip to extract the installed EXE, probes both with the exact metadata command,
+checks rejection of unsupported Hub commands, and records all three hashes.
+Tauri's packaging marker can make the portable and installed binaries different.
+The descriptor must contain the extracted installed EXE hash, not the portable's.
+
+Outputs under the fresh candidate directory:
+
+- `Creator-Project-Setup-0.3.0-alpha.1-Windows-setup.exe`
+- `Creator-Project-Setup-0.3.0-alpha.1-Windows.exe` (portable)
+- `installed-payload/creator-project-setup.exe` (verification evidence)
+- `creator-hub-windows-x86_64.UNSIGNED.json` (descriptor draft, not loadable release metadata)
+- `candidate-report.json`, `guard-report.json`, and `SHA256SUMS.txt`
+
+The report records the source revision and dirty-tree flag. Local dirty builds
+are development evidence only. CI test logs accompany the candidate but are not
+replaced by the artifact-check report. An incomplete or failed job is not a
+candidate to distribute, even when diagnostic artifacts were uploaded.
+
+Identity protocol 1 is derived only from the exact native metadata/rejection
+checks. Lifecycle and installer protocols remain 0. Minimum planned Hub version
+is `0.1.0-alpha.3`. The unsigned descriptor contains no hosting extension.
+Signing/publication remain the coordinated Hub release task's responsibility.
+
+## Local Preparation Evidence (2026-09-10)
+
+The dirty development checkout produced a Windows candidate successfully:
+35 Rust tests passed (4 explicit live tests remained ignored), 32 browser tests
+passed, and the packaged portable/extracted EXEs passed identity and argument
+rejection checks. The no-install guard fixture returned 10 before the legacy
+page while its fixture process and pre-existing Setup processes survived.
+
+Local evidence is under `dist/windows-candidate-local-20260910/candidate/`.
+Its report has `sourceDirty: true` and `publicationReady: false`. These hashes
+identify that local build only; rebuild from the coordinated committed source
+and repeat acceptance before distributing:
+
+- Installer: `69e092389052ad0ba371d40a3989ba6b552653ec1f14d9c0591cd5e5b473de15`
+- Portable: `c234d4f0c77548bb2154b3df3255d4cc59bb1ca6ab234b98e2b0b9a254930b3b`
+- Extracted installed EXE: `94f800232aa308e115b1c7c1f5c26009110c6581a18e94aa16594dd4c2a3bfa8`
+
+The new workflow passed Actionlint 1.7.12 locally. At this local checkpoint it
+had not been pushed or run on GitHub. CI results are recorded separately in
+GitHub Actions; a candidate build does not satisfy the installation gates below.
+
+## Installed Upgrade Gate
+
+The no-install NSIS fixture confirms early refusal before the legacy selection
+page when a same-name process is running. It is **not** proof of an installed
+upgrade, settings migration, or a historical uninstaller's behavior.
+
+Before distributing the installer, use a disposable Windows VM/profile and the
+exact public 0.2.2 installer, not a fabricated registry entry. Keep installer and
+installed EXE hashes, OS/user scope, exit codes, logs, and before/after snapshots.
+
+| Scenario | Required evidence | Current gate |
+| --- | --- | --- |
+| Fresh install and standalone launch | Installed identity matches extracted hash; normal GUI opens; uninstall registration correct | Not run |
+| Closed 0.2.2 to candidate | Legitimate preferences and project receipts preserved; no duplicate installation | Not run |
+| Running 0.2.2 upgrade, GUI and silent | Refuses before invoking old uninstaller; old process survives; no changed files/registration | Not run |
+| Candidate busy creating/repairing | Upgrade and uninstall refuse; operation and Editor survive | Not run |
+| Cancelled/failed upgrade | Prior app remains usable; no false success or deleted settings | Not run |
+| Portable plus installed copies/custom location | Explicit selection; unrelated copies and content untouched | Not run |
+| Reinstall and uninstall | Only owned installation removed; Unity projects and user settings retained as documented | Not run |
+| Hub open/download/install/readback | Descriptor, approvals, version/hash readback, and refusal behavior agree | Not run |
+
+Run these on the packaged bits after all source changes land. A clean build,
+metadata pass, or browser mock cannot promote `installerProtocol` to 1.
+Do not run historical installers on the developer's active Windows profile.
+
+macOS/Linux remain separate native acceptance gates. The existing tag workflow
+can package them but does not establish that their Unity workflows work.

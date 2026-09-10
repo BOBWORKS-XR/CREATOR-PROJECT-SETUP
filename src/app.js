@@ -1,6 +1,6 @@
-const invoke = window.__TAURI__.core.invoke;
+const invoke = window.CreatorRuntime.invoke;
 
-window.__TAURI__.event.listen('creator-lifecycle-close-blocked', () => {
+window.CreatorRuntime.listen('creator-lifecycle-close-blocked', () => {
   showActionError('Setup is still working. Wait for the operation to finish before closing it.');
 }).catch(() => {});
 
@@ -194,7 +194,7 @@ elements.create.addEventListener('click', async () => {
   const timer = setInterval(updateElapsed, 1000);
   let unlisten;
   try {
-    unlisten = await window.__TAURI__.event.listen('setup-progress', event => renderProgress(event.payload));
+    unlisten = await window.CreatorRuntime.listen('setup-progress', event => renderProgress(event.payload));
     const result = await invoke('create_project', { request: {
       projectName: elements.projectName.value,
       parentDirectory: elements.parentFolder.value,
@@ -380,7 +380,7 @@ async function runExisting(repair) {
   let unlisten;
   updateControls();
   try {
-    unlisten = await window.__TAURI__.event.listen('existing-progress', event => { existing.detail.textContent = event.payload.detail; });
+    unlisten = await window.CreatorRuntime.listen('existing-progress', event => { existing.detail.textContent = event.payload.detail; });
     const result = await invoke('run_existing_project', { request: { projectPath: reviewed.projectPath, fingerprint: reviewed.fingerprint, repair, approved: true } });
     existing.result.className = `result${result.success ? ' success' : ''}`;
     existing.result.innerHTML = `<strong>${result.success ? 'Validation passed' : 'Needs attention'}</strong><br>${escapeHtml(result.message)}<br>Backup: ${escapeHtml(result.backupPath)}<br>Report: ${escapeHtml(result.reportPath)}`;
