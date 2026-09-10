@@ -36,6 +36,8 @@ both the declared and observed values instead of hiding that discrepancy.
 - Reopen Unity in a second batch session to check that configuration persisted.
 - Show real setup stages, recent import activity, and elapsed time. Stage counts
   are not download percentages or an estimate of time remaining.
+- Add completed projects to Unity Hub automatically, then read back the registry
+  to verify the exact project path. Opening the Editor is a separate action.
 - Open Unity Hub for missing installations and open a completed project.
 - Keep a completed project ready to open; creating another project is a separate
   action, so a second click cannot restart creation in the same folder.
@@ -54,7 +56,52 @@ or Android APK, uploaded a space, or tested interaction in a headset.
 Setup logs and receipts are kept in `.creator-project-setup` inside the created
 project. The temporary Editor validator is removed after successful creation.
 
-## 0.1.1 Hotfix
+## 0.2.0 Preview
+
+### Automatic Unity Hub Registration
+
+After new-project validation, Setup uses the official
+[Unity CLI project commands](https://docs.unity.com/en-us/unity-cli/unity-cli-reference#manage-projects-in-the-hub-registry)
+to register the project. It downloads a private, pinned Unity CLI
+`1.0.0-beta.9` helper from Unity's CDN (about 21 MB on Windows), verifies its
+size and SHA-256, and rechecks the cached helper before execution. No Git,
+terminal, PATH change, or separate CLI installation is required.
+
+Registration has its own progress stage and retry action. A download or Hub
+failure does not discard the validated project or prevent opening it. An already
+running older Hub may need reopening to refresh its project list. Setup does not
+edit Hub's internal database, link a Unity Cloud project, or change analytics
+consent. The helper is a Unity beta component, not source code bundled under this
+repository's MIT license.
+
+### Existing Projects
+
+1. Select **Existing project**, choose the Unity project folder, and inspect it.
+   Inspection reads files only; it does not open Unity or change the project.
+2. Review findings and proposed changes. Close the project in Unity before repair
+   or validation. Changed configuration invalidates the earlier review.
+3. Approve the settings backup, then apply the offered repairs or run validation.
+
+This first repair pass handles missing tested packages, missing Creator registry
+scopes, required built-in modules, and incomplete Creator Visual Scripting setup.
+It preserves unrelated manifest entries and merges existing Visual Scripting
+type selections. Conflicting registries, untested Editor/SDK/package versions,
+linked project files, and open projects are refused, not silently rewritten.
+
+**Backup scope:** package manifests, all project settings, and generated Visual
+Scripting data. It is not a complete project backup. Unity imports and installed
+package callbacks can modify assets. Use version control or a separate full copy
+for valuable content. A failed run retains the backup and logs for **manual
+recovery**; automatic rollback is not implemented in this preview.
+
+Backups, reviewed plans, results, and Unity logs are stored under
+`.creator-project-setup/backups/` in the selected project. Repair does not rebuild
+scenes, convert materials, change render pipelines, upgrade Unity, or migrate
+Banter projects. A missing URP assignment requires review in Unity.
+See [repair recovery notes](docs/REPAIR-RECOVERY.md) before working on important
+existing content.
+
+## Earlier 0.1.1 Hotfix
 
 - Fixed a first-open warning caused by missing Visual Scripting project settings.
 - Added a second-process validation gate instead of relying on machine-wide SDK
@@ -85,16 +132,9 @@ Windows, macOS, and Linux by GitHub Actions.
 
 ## Roadmap
 
-See [docs/PLAN.md](docs/PLAN.md). Existing-project repair and optional Creator
-Works MCP setup follow the proven new-project workflow; neither is hidden inside
-the initial creation path.
-
-Unity Hub registration is a separate compatibility task. The test project was
-observed in Hub 3.14.4's saved list after opening, but this is not yet a guarantee
-across Hub versions/platforms. The documented
-[Unity CLI project registry](https://docs.unity.com/en-us/unity-cli/unity-cli-reference#manage-projects-in-the-hub-registry)
-is the intended explicit-registration route when available. Setup does not edit
-Hub's internal database or require Unity Cloud linking.
+See [docs/PLAN.md](docs/PLAN.md). Existing-project repair is a separate preview
+workflow; optional Creator Works MCP installation follows later and is not
+required for SDK correctness.
 
 ## License
 

@@ -12,12 +12,22 @@
 - Real setup stages and elapsed time; explicit completion/Open/Create another states.
 - macOS/Linux packaging and detection preview.
 
-## 0.2 - Repair Mode
+## 0.2 - Hub Registration and Repair Preview
 
 - Inspect an existing project without changing it.
 - Show a proposed compatibility repair.
-- Back up manifests and project settings before an approved repair.
+- Reject open projects, stale reviews, links and incompatible versions.
+- Back up manifests, project settings and generated Visual Scripting data before
+  an approved repair or Unity validation; verify backup file hashes.
+- Merge custom Visual Scripting selections and verify them on reopening.
 - Re-run package, compilation, render-pipeline, and platform validation.
+- Register completed new projects using a pinned, checksum-verified official
+  Unity CLI helper. Verify registration and allow independent retry.
+- Do not edit Hub's private database or silently link Unity Cloud.
+
+Still required before promoting repair beyond preview: broader existing-project
+fixtures, recovery UX, third-party package callback coverage, and native
+macOS/Linux acceptance. Backups are selective; failure recovery is manual.
 
 ## 0.3 - Optional Creator Works MCP
 
@@ -28,10 +38,6 @@
 ## Later
 
 - Tested macOS and Linux installation workflows.
-- Register successful projects in Unity Hub through a supported, version-checked
-  interface. Prefer the official Unity CLI registry commands where available;
-  preserve a usable project and report manual fallback if registration fails.
-  Never rewrite Hub's private project database or silently link Unity Cloud.
 - Signed/notarized packages.
 - SideQuest-maintained compatibility recipe feed with integrity metadata.
 - Safe SDK upgrades with preview, backup, rollback, and migration checks.

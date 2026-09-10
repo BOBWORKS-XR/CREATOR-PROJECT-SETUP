@@ -20,13 +20,107 @@ async function setup(page, options = {}) {
       if (command === 'create_project') {
         if (window.options.pending) await new Promise(resolve => window.finishCreate = resolve);
         if (window.options.failCreate) throw 'Project already exists. No files were changed.';
-        return { success: true, projectPath: `${args.request.parentDirectory}\\${args.request.projectName}`, message: 'Project validated.' };
+        return { success: true, projectPath: `${args.request.parentDirectory}\\${args.request.projectName}`, message: 'Project validated.', hub: { registered: !window.options.failHub, message: window.options.failHub ? 'Download failed. Your project is ready to open.' : 'Added to Unity Hub and verified.' } };
+      }
+      if (command === 'register_project') return { registered: true, message: 'Added to Unity Hub and verified.' };
+      if (command === 'inspect_project') return {
+        projectPath: args.path, fingerprint: 'reviewed-files-sha256', canRepair: !window.options.blocked, canValidate: !window.options.blocked,
+        findings: [{ status: window.options.blocked ? 'blocked' : 'repair', title: 'Visual Scripting setup', detail: window.options.blocked ? 'Project is open. Close Unity.' : 'Node database is missing.' }, { status: 'pass', title: 'Unity version', detail: '6000.3.21f1' }],
+        proposedChanges: window.options.blocked ? [] : ['Rebuild Creator Visual Scripting nodes; retain existing type selections.'],
+      };
+      if (command === 'run_existing_project') {
+        if (window.options.pendingRepair) await new Promise(resolve => window.finishRepair = resolve);
+        return { success: !window.options.failRepair, projectPath: args.request.projectPath, backupPath: `${args.request.projectPath}\\.creator-project-setup\\backups\\test`, reportPath: 'result.json', message: window.options.failRepair ? 'Compilation failed. Backup retained. No automatic rollback was attempted.' : 'Unity validation passed.' };
       }
       if (command === 'open_project' && window.options.failOpen) throw 'Unity could not be opened.';
     } } };
   }, options);
   await page.goto(pathToFileURL(path.resolve('src/index.html')).href);
   await expect(page.locator('#create-button')).toBeEnabled();
+}
+
+test('Hub failure preserves completed project and retry does not recreate it', async ({ page }) => {
+  await setup(page, { failHub: true });
+  await page.locator('#create-button').click();
+  await expect(page.locator('#hub-result')).toContainText('Download failed');
+  await expect(page.locator('#open-project-button')).toBeEnabled();
+  await page.locator('#retry-hub-button').click();
+  await expect(page.locator('#hub-result')).toHaveText('Added to Unity Hub and verified.');
+  await expect(page.locator('#retry-hub-button')).toBeHidden();
+  const calls = await page.evaluate(() => window.calls);
+  expect(calls.filter(call => call.command === 'create_project')).toHaveLength(1);
+  expect(calls.filter(call => call.command === 'register_project')).toHaveLength(1);
+});
+
+async function inspectExisting(page, options = {}) {
+  await setup(page, options);
+  await page.locator('#existing-mode').click();
+  await page.locator('#existing-path').fill('F:\\UnityTest\\Existing project');
+  await page.locator('#inspect-button').click();
+  await expect(page.locator('#inspection-findings')).toContainText('Visual Scripting');
+}
+
+test('existing inspection is separate from approval and invalidates on path changes', async ({ page }) => {
+  await inspectExisting(page);
+  await expect(page.locator('#repair-button')).toBeDisabled();
+  await page.locator('#repair-button').dispatchEvent('click');
+  expect(await page.evaluate(() => window.calls.some(call => call.command === 'run_existing_project'))).toBe(false);
+  await page.locator('#existing-approval').check();
+  await expect(page.locator('#repair-button')).toBeEnabled();
+  await page.locator('#existing-path').fill('F:\\UnityTest\\Different project');
+  await expect(page.locator('#inspection-results')).toBeHidden();
+  await expect(page.locator('#existing-approval')).not.toBeChecked();
+  await page.locator('#repair-button').dispatchEvent('click');
+  expect(await page.evaluate(() => window.calls.some(call => call.command === 'run_existing_project'))).toBe(false);
+});
+
+test('approved repair sends exact reviewed path and fingerprint, locks controls and retains report', async ({ page }) => {
+  await inspectExisting(page, { pendingRepair: true });
+  await page.locator('#existing-approval').check();
+  await page.locator('#repair-button').click();
+  await expect(page.locator('#new-mode')).toBeDisabled();
+  await expect(page.locator('#existing-path')).toBeDisabled();
+  await page.locator('#repair-button').dispatchEvent('click');
+  await page.evaluate(() => window.progressCallback({ payload: { step: 4, detail: 'Generating Creator node database.' } }));
+  await expect(page.locator('#existing-detail')).toHaveText('Generating Creator node database.');
+  await page.evaluate(() => window.finishRepair());
+  await expect(page.locator('#existing-result')).toContainText('Validation passed');
+  await expect(page.locator('#existing-result')).toContainText('Backup:');
+  await page.locator('#open-existing-button').click();
+  const calls = await page.evaluate(() => window.calls);
+  expect(calls.filter(call => call.command === 'run_existing_project')).toEqual([{ command: 'run_existing_project', args: { request: { projectPath: 'F:\\UnityTest\\Existing project', fingerprint: 'reviewed-files-sha256', repair: true, approved: true } } }]);
+  expect(calls.find(call => call.command === 'open_project').args.path).toBe('F:\\UnityTest\\Existing project');
+  expect(await page.evaluate(() => window.progressCallback)).toBe(null);
+  await expect(page.locator('#repair-button')).toBeDisabled();
+});
+
+test('validation failure retains backup information and does not offer a successful Open', async ({ page }) => {
+  await inspectExisting(page, { failRepair: true });
+  await page.locator('#existing-approval').check();
+  await page.locator('#validate-button').click();
+  await expect(page.locator('#existing-result')).toContainText('Compilation failed');
+  await expect(page.locator('#existing-result')).toContainText('Backup:');
+  await expect(page.locator('#open-existing-button')).toBeHidden();
+  const call = await page.evaluate(() => window.calls.find(call => call.command === 'run_existing_project'));
+  expect(call.args.request.repair).toBe(false);
+});
+
+test('blocked projects cannot start either operation', async ({ page }) => {
+  await inspectExisting(page, { blocked: true });
+  await expect(page.locator('#repair-button')).toBeHidden();
+  await expect(page.locator('#validate-button')).toBeHidden();
+  await expect(page.locator('#existing-approval-label')).toBeHidden();
+  await expect(page.locator('#inspection-findings')).toContainText('Blocked');
+});
+
+for (const width of [980, 720]) {
+  test(`existing repair review layout at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 760 });
+    await inspectExisting(page);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath('repair-review.png'), fullPage: true });
+    expect(await page.locator('.brand img').evaluate(img => img.naturalWidth > 0)).toBe(true);
+  });
 }
 
 test('completion cannot recreate the project, including after a refresh', async ({ page }) => {

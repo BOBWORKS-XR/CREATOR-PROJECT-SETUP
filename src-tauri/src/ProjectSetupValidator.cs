@@ -29,21 +29,65 @@ namespace CreatorWorks
             public bool creatorVisualScriptingConfigured;
             public int nodeCount;
             public int creatorNodeCount;
+            public bool preservedVisualScriptingSelections;
             public string checkedAtUtc;
             public string error;
         }
 
         public static void Configure()
         {
+            Configure(false);
+        }
+
+        public static void ConfigureExisting()
+        {
+            Configure(true);
+        }
+
+        [Serializable]
+        private sealed class ExistingRequest { public string backupPath; }
+        private static bool preserveSelections;
+
+        private static DictionaryAsset OriginalSelections()
+        {
+            var path = Path.Combine(StatusFolder, "existing-request.json");
+            if (!File.Exists(path)) return null;
+            var request = JsonUtility.FromJson<ExistingRequest>(File.ReadAllText(path));
+            var original = Path.Combine(request.backupPath, "ProjectSettings", "VisualScriptingSettings.asset");
+            if (!File.Exists(original) || new FileInfo(original).Length == 0) return null;
+            var saved = UnityEditorInternal.InternalEditorUtility.LoadSerializedFileAndForget(original).OfType<DictionaryAsset>().FirstOrDefault();
+            if (saved == null) throw new InvalidOperationException("The original Visual Scripting settings could not be loaded. Backup retained.");
+            return saved;
+        }
+
+        private static void Configure(bool preserve)
+        {
             try
             {
                 Progress(4, "Initializing Visual Scripting and saving Creator SDK type settings.");
                 VSUsageUtility.isVisualScriptingUsed = true;
                 var config = BoltCore.Configuration;
-                config.assemblyOptions.Clear();
-                config.assemblyOptions.AddRange(VsNodeGeneration.assemblyAllowList.Select(name => new LooseAssemblyName(name)));
-                config.typeOptions.Clear();
-                config.typeOptions.AddRange(VsNodeGeneration.typeAllowList);
+                preserveSelections = preserve;
+                if (!preserve) { config.assemblyOptions.Clear(); config.typeOptions.Clear(); }
+                else
+                {
+                    // SDK startup callbacks can run before executeMethod. Merge the reviewed
+                    // backup's selections as well, so their startup cannot erase user additions.
+                    var saved = OriginalSelections();
+                    if (saved != null)
+                    {
+                        if (saved.ContainsKey("assemblyOptions"))
+                            foreach (var assembly in (System.Collections.Generic.List<LooseAssemblyName>)saved["assemblyOptions"])
+                                if (!config.assemblyOptions.Contains(assembly)) config.assemblyOptions.Add(assembly);
+                        if (saved.ContainsKey("typeOptions"))
+                            foreach (var type in (System.Collections.Generic.List<Type>)saved["typeOptions"])
+                                if (type != null && !config.typeOptions.Contains(type)) config.typeOptions.Add(type);
+                    }
+                }
+                foreach (var name in VsNodeGeneration.assemblyAllowList)
+                    if (!config.assemblyOptions.Contains(new LooseAssemblyName(name))) config.assemblyOptions.Add(new LooseAssemblyName(name));
+                foreach (var type in VsNodeGeneration.typeAllowList)
+                    if (!config.typeOptions.Contains(type)) config.typeOptions.Add(type);
                 config.Save();
                 config.SaveProjectSettingsAsset(true);
                 Codebase.UpdateSettings();
@@ -61,7 +105,8 @@ namespace CreatorWorks
                 if (!File.Exists("ProjectSettings/VisualScriptingSettings.asset"))
                     throw new InvalidOperationException("Visual Scripting settings were not saved.");
                 Progress(4, "Generating the Creator SDK Visual Scripting node database.");
-                VsNodeGeneration.SetVSTypesAndAssemblies();
+                if (preserveSelections) UnitBase.Rebuild();
+                else VsNodeGeneration.SetVSTypesAndAssemblies();
                 AssetDatabase.SaveAssets();
                 EditorApplication.Exit(0);
             }
@@ -85,6 +130,7 @@ namespace CreatorWorks
                     androidSupported = BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Android, BuildTarget.Android),
                     windowsSupported = BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.Standalone, BuildTarget.StandaloneWindows64),
                     visualScriptingInitialized = File.Exists("ProjectSettings/VisualScriptingSettings.asset") && VSUsageUtility.isVisualScriptingUsed && PluginContainer.initialized,
+                    preservedVisualScriptingSelections = true,
                     checkedAtUtc = DateTime.UtcNow.ToString("O")
                 };
                 if (result.visualScriptingInitialized)
@@ -92,6 +138,12 @@ namespace CreatorWorks
                     var config = BoltCore.Configuration;
                     result.creatorVisualScriptingConfigured = VsNodeGeneration.assemblyAllowList.All(name => config.assemblyOptions.Contains(new LooseAssemblyName(name)))
                         && VsNodeGeneration.typeAllowList.All(type => config.typeOptions.Contains(type));
+                    var original = OriginalSelections();
+                    if (original != null)
+                    {
+                        if (original.ContainsKey("assemblyOptions")) result.preservedVisualScriptingSelections &= ((System.Collections.Generic.List<LooseAssemblyName>)original["assemblyOptions"]).All(config.assemblyOptions.Contains);
+                        if (original.ContainsKey("typeOptions")) result.preservedVisualScriptingSelections &= ((System.Collections.Generic.List<Type>)original["typeOptions"]).All(config.typeOptions.Contains);
+                    }
                     if (File.Exists(BoltFlow.Paths.unitOptions))
                     {
                         using (NativeUtility.Module("sqlite3.dll"))
@@ -109,7 +161,7 @@ namespace CreatorWorks
                     && result.inputSystemVersion == "@@INPUT_SYSTEM_VERSION@@"
                     && result.urpConfigured && result.androidSupported && result.windowsSupported
                     && result.visualScriptingInitialized && result.creatorVisualScriptingConfigured
-                    && result.nodeCount > 0 && result.creatorNodeCount > 0;
+                    && result.nodeCount > 0 && result.creatorNodeCount > 0 && result.preservedVisualScriptingSelections;
                 WriteResult(result);
                 EditorApplication.Exit(result.success ? 0 : 2);
             }

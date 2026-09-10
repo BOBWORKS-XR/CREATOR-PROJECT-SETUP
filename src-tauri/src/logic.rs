@@ -17,8 +17,8 @@ pub const CREATOR_SDK_VERSION: &str = "4.0.14";
 pub const URP_VERSION: &str = "17.3.0";
 pub const INPUT_SYSTEM_VERSION: &str = "1.20.0";
 pub const SDK_DECLARED_URP_VERSION: &str = "17.4.0";
-const REGISTRY_URL: &str = "https://greenfield-registry.sdq.st";
-const REQUIRED_BUILTIN_MODULES: &[&str] = &[
+pub(crate) const REGISTRY_URL: &str = "https://greenfield-registry.sdq.st";
+pub(crate) const REQUIRED_BUILTIN_MODULES: &[&str] = &[
     "com.unity.modules.accessibility",
     "com.unity.modules.adaptiveperformance",
     "com.unity.modules.ai",
@@ -113,6 +113,7 @@ pub struct CreationResult {
     pub log_path: String,
     pub receipt_path: String,
     pub message: String,
+    pub hub: crate::hub::HubRegistration,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -122,7 +123,7 @@ pub struct SetupProgress {
 }
 
 impl SetupProgress {
-    fn new(step: u8, detail: impl Into<String>) -> Self {
+    pub(crate) fn new(step: u8, detail: impl Into<String>) -> Self {
         Self {
             step,
             detail: detail.into(),
@@ -521,7 +522,7 @@ fn update_project_name(project: &Path, project_name: &str) -> Result<(), String>
         .map_err(|error| format!("Cannot write project settings: {error}"))
 }
 
-fn validation_script() -> String {
+pub(crate) fn validation_script() -> String {
     include_str!("ProjectSetupValidator.cs")
         .replace("@@EDITOR_VERSION@@", EDITOR_VERSION)
         .replace("@@CREATOR_SDK_VERSION@@", CREATOR_SDK_VERSION)
@@ -557,7 +558,7 @@ fn unity_progress(target: &Path, log: &Path, step: u8) -> Option<SetupProgress> 
     })
 }
 
-fn run_unity(
+pub(crate) fn run_unity(
     editor: &str,
     target: &Path,
     method: &str,
@@ -567,7 +568,7 @@ fn run_unity(
 ) -> Result<(), String> {
     let mut child = Command::new(editor)
         .args(["-batchmode", "-nographics", "-projectPath"])
-        .arg(target)
+        .arg(crate::repair::display_path(target))
         .args([
             "-buildTarget",
             "Android",
@@ -575,7 +576,7 @@ fn run_unity(
             method,
             "-logFile",
         ])
-        .arg(log)
+        .arg(crate::repair::display_path(log))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -600,14 +601,14 @@ fn run_unity(
         Ok(Some(status)) if status.success() => Ok(()),
         Ok(Some(_)) => Err(format!(
             "Unity setup failed. Review {}. The project was preserved.",
-            log.display()
+            crate::repair::display_path(log)
         )),
         result => {
             let _ = child.kill();
             let _ = child.wait();
             Err(format!(
                 "Unity setup did not finish ({result:?}). Review {}. The project was preserved.",
-                log.display()
+                crate::repair::display_path(log)
             ))
         }
     }
@@ -753,6 +754,12 @@ pub fn create_project(
 
         let _ = fs::remove_file(&validator);
         let _ = fs::remove_file(validator.with_extension("cs.meta"));
+        progress(SetupProgress::new(
+            6,
+            "Adding the validated project to Unity Hub.",
+        ));
+        let hub =
+            crate::hub::register_project(&target, |detail| progress(SetupProgress::new(6, detail)));
         let receipt_path = write_receipt(
             &target,
             &json!({
@@ -763,11 +770,12 @@ pub fn create_project(
                 "activeBuildTarget": "android",
                 "requiredBuildTargets": ["android", "windows"],
                 "validation": validation,
+                "hub": hub,
                 "logPath": log_path
             }),
         )?;
         progress(SetupProgress::new(
-            6,
+            7,
             "Validation passed. Project is ready to open.",
         ));
         Ok(CreationResult {
@@ -776,6 +784,7 @@ pub fn create_project(
             log_path: log_path.to_string_lossy().to_string(),
             receipt_path: receipt_path.to_string_lossy().to_string(),
             message: "Creator SDK project compiled, initialized Visual Scripting, and passed checks after reopening.".into(),
+            hub,
         })
     })();
 
@@ -940,6 +949,7 @@ mod tests {
         )
         .expect("real Unity setup should succeed");
         assert!(result.success);
+        assert!(result.hub.registered, "{}", result.hub.message);
         assert!(Path::new(&result.receipt_path).is_file());
         println!("{}", serde_json::to_string(&result).unwrap());
     }

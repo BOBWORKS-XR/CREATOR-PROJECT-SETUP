@@ -20,13 +20,18 @@
 
   <main>
     <section class="intro">
-      <p class="eyebrow">NEW PROJECT</p>
-      <h1>Build-ready Unity setup</h1>
-      <p>Create a clean Creator SDK project with the correct Unity, URP, Android and Windows requirements.</p>
+      <p class="eyebrow" id="mode-eyebrow">NEW PROJECT</p>
+      <h1 id="mode-heading">Build-ready Unity setup</h1>
+      <p id="mode-description">Create a clean Creator SDK project with the correct Unity, URP, Android and Windows requirements.</p>
     </section>
 
+    <nav class="mode-tabs" role="tablist" aria-label="Project workflow">
+      <button type="button" id="new-mode" role="tab" aria-selected="true" aria-controls="new-project-pane">New project</button>
+      <button type="button" id="existing-mode" role="tab" aria-selected="false" aria-controls="existing-project-pane">Existing project</button>
+    </nav>
+
     <div class="workspace">
-      <section class="setup-pane" aria-labelledby="project-heading">
+      <section id="new-project-pane" class="setup-pane" role="tabpanel" aria-labelledby="new-mode">
         <div class="section-heading">
           <div>
             <p class="eyebrow">PROJECT</p>
@@ -57,7 +62,34 @@
           <span id="elapsed-time" class="elapsed-time"></span>
         </div>
         <div id="result" class="result hidden" aria-live="polite"></div>
+        <div id="hub-result" class="hub-result hidden" aria-live="polite"></div>
+        <button id="retry-hub-button" class="secondary-button full-width hidden" type="button">Retry adding to Unity Hub</button>
         <div id="action-error" class="result hidden" role="alert"></div>
+      </section>
+
+      <section id="existing-project-pane" class="setup-pane hidden" role="tabpanel" aria-labelledby="existing-mode">
+        <div class="section-heading"><div><p class="eyebrow">PROJECT</p><h2>Inspect and repair</h2></div><span class="preview-label">PREVIEW</span></div>
+        <label for="existing-path">Unity project folder</label>
+        <div class="input-action">
+          <input id="existing-path" type="text" autocomplete="off" spellcheck="false">
+          <button id="existing-browse" class="secondary-button" type="button">Browse</button>
+        </div>
+        <button id="inspect-button" class="secondary-button full-width" type="button">Inspect project</button>
+        <div id="inspection-results" class="hidden">
+          <h3>Inspection findings</h3>
+          <div id="inspection-findings" class="inspection-findings"></div>
+          <details id="repair-plan" class="hidden" open>
+            <summary>Proposed changes</summary>
+            <ul id="repair-changes"></ul>
+          </details>
+          <label class="approval-label" id="existing-approval-label"><input id="existing-approval" type="checkbox">Back up settings and allow Unity to import and validate this project.</label>
+          <p class="recipe-line">Backup covers package manifests, project settings and generated Visual Scripting data, not the whole project. Unity package callbacks may modify assets during import. Failed repairs retain the backup for manual recovery; no automatic rollback.</p>
+          <button id="repair-button" class="primary-button hidden" type="button" disabled>Back up and apply repairs</button>
+          <button id="validate-button" class="secondary-button full-width hidden" type="button" disabled>Back up and validate in Unity</button>
+        </div>
+        <div id="existing-activity" class="activity hidden" aria-live="polite"><div class="activity-header"><span class="spinner"></span><strong id="existing-stage">Inspecting</strong></div><p id="existing-detail"></p><span id="existing-elapsed" class="elapsed-time"></span></div>
+        <div id="existing-result" class="result hidden" aria-live="polite"></div>
+        <button id="open-existing-button" class="primary-button hidden" type="button">Open project in Unity</button>
       </section>
 
       <section class="requirements-pane" aria-labelledby="requirements-heading">
@@ -75,17 +107,10 @@
       </section>
     </div>
 
-    <section class="next-section">
-      <div>
-        <p class="eyebrow">COMING NEXT</p>
-        <h2>Repair existing projects</h2>
-      </div>
-      <p>Read-only inspection first, then a reviewed backup and repair. Optional Creator Works MCP setup follows after the Unity baseline passes.</p>
-    </section>
   </main>
 
   <footer>
-    <span>Creator Project Setup 0.1.1</span>
+    <span>Creator Project Setup 0.2.0 Preview</span>
     <button id="sdk-source-button" class="text-button" type="button">Creator SDK source</button>
   </footer>
   <script src="app.js"></script>

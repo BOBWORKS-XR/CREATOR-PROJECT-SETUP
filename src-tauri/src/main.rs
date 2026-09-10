@@ -1,6 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod hub;
 mod logic;
+mod repair;
 
 use logic::{CreateRequest, CreationResult, EnvironmentReport, Recipe};
 use tauri::Emitter;
@@ -50,6 +52,36 @@ fn launch_hub() -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn register_project(path: String) -> Result<hub::HubRegistration, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        hub::register_project(std::path::Path::new(&path), |_| {})
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn inspect_project(path: String) -> Result<repair::Inspection, String> {
+    tauri::async_runtime::spawn_blocking(move || repair::inspect(std::path::Path::new(&path)))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn run_existing_project(
+    app: tauri::AppHandle,
+    request: repair::ExistingRequest,
+) -> Result<repair::ExistingResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        repair::run(request, |progress| {
+            let _ = app.emit("existing-progress", progress);
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 fn open_official_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
     let allowed = [
         "https://unity.com/download",
@@ -89,6 +121,9 @@ fn main() {
             create_project,
             open_project,
             launch_hub,
+            register_project,
+            inspect_project,
+            run_existing_project,
             open_official_url
         ])
         .run(tauri::generate_context!())

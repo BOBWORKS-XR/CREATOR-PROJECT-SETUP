@@ -30,7 +30,18 @@ let createdProject = null;
 let busy = false;
 let checking = false;
 let opening = false;
-const stages = ['Check requirements', 'Prepare project', 'Import and compile', 'Configure Visual Scripting', 'Reopen and validate', 'Project ready'];
+let mode = 'new';
+let inspecting = false;
+let existingReport = null;
+let existingCompleted = null;
+const existing = Object.fromEntries(['path', 'browse', 'approval', 'activity', 'stage', 'detail', 'elapsed', 'result'].map(name => [name, document.querySelector(`#existing-${name}`)]));
+const inspectButton = document.querySelector('#inspect-button');
+const repairButton = document.querySelector('#repair-button');
+const validateButton = document.querySelector('#validate-button');
+const retryHub = document.querySelector('#retry-hub-button');
+const newMode = document.querySelector('#new-mode');
+const existingMode = document.querySelector('#existing-mode');
+const stages = ['Check requirements', 'Prepare project', 'Import and compile', 'Configure Visual Scripting', 'Reopen and validate', 'Add to Unity Hub', 'Project ready'];
 let currentStep = 0;
 
 function renderProgress({ step, detail }) {
@@ -42,7 +53,7 @@ function renderProgress({ step, detail }) {
 }
 
 function updateControls() {
-  const locked = busy || checking || Boolean(createdProject);
+  const locked = busy || inspecting || checking || Boolean(createdProject);
   for (const field of [elements.projectName, elements.parentFolder, elements.browse]) field.disabled = locked;
   elements.create.disabled = locked || !environment?.ready;
   elements.create.classList.toggle('hidden', Boolean(createdProject));
@@ -50,9 +61,23 @@ function updateControls() {
   elements.openProject.disabled = opening;
   elements.createAnother.classList.toggle('hidden', !createdProject);
   elements.createAnother.disabled = opening || checking;
-  elements.refresh.disabled = busy || checking;
-  const label = busy ? 'Creating project' : createdProject ? 'Project ready' : checking ? 'Checking' : environment?.ready ? 'Ready to create' : 'Setup required';
-  elements.overall.className = `overall-status ${createdProject || (!busy && !checking && environment?.ready) ? 'ready' : 'checking'}`;
+  elements.refresh.disabled = busy || inspecting || checking;
+  for (const button of [newMode, existingMode]) button.disabled = busy || inspecting || opening || checking;
+  existing.path.disabled = busy || inspecting;
+  existing.browse.disabled = busy || inspecting;
+  existing.approval.disabled = busy || inspecting;
+  inspectButton.disabled = busy || inspecting || !existing.path.value.trim();
+  repairButton.disabled = busy || inspecting || !existingReport?.canRepair || !existing.approval.checked;
+  validateButton.disabled = busy || inspecting || !existingReport?.canValidate || !existing.approval.checked;
+  retryHub.disabled = busy || inspecting || opening;
+  elements.createAnother.disabled = busy || opening || checking;
+  elements.openProject.disabled = busy || opening;
+  document.querySelector('#open-existing-button').disabled = busy || opening;
+  const label = mode === 'existing' ? busy ? 'Working in Unity' : inspecting ? 'Inspecting project' : existingCompleted ? 'Project validated' : existingReport ? 'Review findings' : 'Select a project'
+    : busy ? createdProject ? 'Adding to Unity Hub' : 'Creating project' : createdProject ? 'Project ready' : checking ? 'Checking' : environment?.ready ? 'Ready to create' : 'Setup required';
+  const ready = mode === 'existing' ? Boolean(existingCompleted) : Boolean(createdProject || environment?.ready);
+  const blocked = mode === 'existing' && existingReport?.findings.some(finding => finding.status === 'blocked');
+  elements.overall.className = `overall-status ${blocked ? 'blocked' : !busy && !checking && !inspecting && ready ? 'ready' : 'checking'}`;
   elements.overall.innerHTML = `<span></span>${label}`;
 }
 
@@ -98,7 +123,7 @@ function renderEnvironment(report) {
 }
 
 async function refresh() {
-  if (busy || checking) return;
+  if (busy || inspecting || checking) return;
   checking = true;
   updateControls();
   try {
@@ -130,7 +155,7 @@ elements.unityDownload.addEventListener('click', () => invoke('open_official_url
 elements.sdkSource.addEventListener('click', () => invoke('open_official_url', { url: 'https://greenfield-registry.sdq.st/-/web/detail/com.sidequest.creator-sdk' }).catch(showActionError));
 
 elements.create.addEventListener('click', async () => {
-  if (busy || checking || createdProject || !environment?.ready) return;
+  if (mode !== 'new' || busy || inspecting || checking || createdProject || !environment?.ready) return;
   busy = true;
   updateControls();
   elements.actionError.classList.add('hidden');
@@ -155,6 +180,7 @@ elements.create.addEventListener('click', async () => {
     }});
     if (!result.success) throw new Error(result.message || 'Project validation failed.');
     createdProject = result.projectPath;
+    renderHubResult(result.hub);
     elements.result.className = 'result success';
     elements.result.innerHTML = `<strong>Ready</strong><br>${escapeHtml(result.message)}<br><span>${escapeHtml(result.projectPath)}</span>`;
     elements.openProject.classList.remove('hidden');
@@ -172,7 +198,7 @@ elements.create.addEventListener('click', async () => {
 });
 
 elements.openProject.addEventListener('click', async () => {
-  if (!createdProject || opening) return;
+  if (!createdProject || opening || busy) return;
   opening = true;
   elements.actionError.classList.add('hidden');
   updateControls();
@@ -184,6 +210,8 @@ elements.openProject.addEventListener('click', async () => {
 elements.createAnother.addEventListener('click', () => {
   if (opening || checking || busy) return;
   createdProject = null;
+  document.querySelector('#hub-result').classList.add('hidden');
+  retryHub.classList.add('hidden');
   elements.projectName.value = '';
   elements.result.classList.add('hidden');
   elements.actionError.classList.add('hidden');
@@ -192,3 +220,129 @@ elements.createAnother.addEventListener('click', () => {
 });
 
 refresh();
+
+function renderHubResult(result) {
+  const element = document.querySelector('#hub-result');
+  element.className = `hub-result${result?.registered ? '' : ' pending'}`;
+  element.textContent = result?.message || 'Hub registration has not been verified. Your project is ready to open.';
+  retryHub.classList.toggle('hidden', Boolean(result?.registered));
+}
+
+retryHub.addEventListener('click', async () => {
+  if (!createdProject || busy || opening) return;
+  busy = true;
+  updateControls();
+  document.querySelector('#hub-result').textContent = 'Adding the project to Unity Hub...';
+  try { renderHubResult(await invoke('register_project', { path: createdProject })); }
+  catch (error) { renderHubResult({ registered: false, message: String(error) }); }
+  finally { busy = false; updateControls(); }
+});
+
+function setMode(value) {
+  if (busy || inspecting || opening || checking) return;
+  mode = value;
+  const isNew = value === 'new';
+  document.querySelector('#new-project-pane').classList.toggle('hidden', !isNew);
+  document.querySelector('#existing-project-pane').classList.toggle('hidden', isNew);
+  newMode.setAttribute('aria-selected', String(isNew));
+  existingMode.setAttribute('aria-selected', String(!isNew));
+  document.querySelector('#mode-eyebrow').textContent = isNew ? 'NEW PROJECT' : 'EXISTING PROJECT';
+  document.querySelector('#mode-heading').textContent = isNew ? 'Build-ready Unity setup' : 'Project health check';
+  document.querySelector('#mode-description').textContent = isNew ? 'Create a clean Creator SDK project with the correct Unity, URP, Android and Windows requirements.' : 'Creator SDK, package, Visual Scripting and build-platform validation.';
+  updateControls();
+}
+newMode.addEventListener('click', () => setMode('new'));
+existingMode.addEventListener('click', () => setMode('existing'));
+for (const [button, other] of [[newMode, existingMode], [existingMode, newMode]]) {
+  button.addEventListener('keydown', event => {
+    if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault();
+      const next = event.key === 'Home' ? newMode : event.key === 'End' ? existingMode : other;
+      next.click(); next.focus();
+    }
+  });
+}
+
+function clearInspection() {
+  existingReport = null;
+  existingCompleted = null;
+  existing.approval.checked = false;
+  document.querySelector('#inspection-results').classList.add('hidden');
+  document.querySelector('#open-existing-button').classList.add('hidden');
+  existing.result.classList.add('hidden');
+  updateControls();
+}
+existing.path.addEventListener('input', clearInspection);
+existing.approval.addEventListener('change', updateControls);
+existing.browse.addEventListener('click', async () => {
+  if (busy || inspecting) return;
+  try {
+    const path = await invoke('pick_parent_folder');
+    if (path && !busy && !inspecting) { existing.path.value = path; clearInspection(); }
+  } catch (error) { existing.result.className = 'result'; existing.result.textContent = String(error); }
+});
+
+inspectButton.addEventListener('click', async () => {
+  if (busy || inspecting || !existing.path.value.trim()) return;
+  clearInspection();
+  inspecting = true;
+  existing.activity.classList.remove('hidden');
+  existing.stage.textContent = 'Inspecting project files';
+  existing.detail.textContent = 'No files are being changed.';
+  existing.elapsed.textContent = '';
+  updateControls();
+  try {
+    existingReport = await invoke('inspect_project', { path: existing.path.value });
+    existing.path.value = existingReport.projectPath;
+    document.querySelector('#inspection-results').classList.remove('hidden');
+    const labels = { pass: 'Ready', blocked: 'Blocked', repair: 'Repair available', check: 'Needs Unity check' };
+    document.querySelector('#inspection-findings').innerHTML = existingReport.findings.map(finding => `<div class="inspection-finding ${Object.hasOwn(labels, finding.status) ? finding.status : 'check'}"><strong>${escapeHtml(finding.title)}: ${labels[finding.status] || 'Review'}</strong><p>${escapeHtml(finding.detail)}</p></div>`).join('');
+    document.querySelector('#repair-plan').classList.toggle('hidden', existingReport.proposedChanges.length === 0);
+    document.querySelector('#repair-changes').innerHTML = existingReport.proposedChanges.map(change => `<li>${escapeHtml(change)}</li>`).join('');
+    repairButton.classList.toggle('hidden', !existingReport.canRepair);
+    validateButton.classList.toggle('hidden', !existingReport.canValidate);
+    document.querySelector('#existing-approval-label').classList.toggle('hidden', !existingReport.canRepair && !existingReport.canValidate);
+  } catch (error) { existing.result.className = 'result'; existing.result.textContent = String(error); }
+  finally { inspecting = false; existing.activity.classList.add('hidden'); updateControls(); }
+});
+
+async function runExisting(repair) {
+  if (busy || inspecting || !existingReport || !existing.approval.checked || !(repair ? existingReport.canRepair : existingReport.canValidate)) return;
+  const reviewed = existingReport;
+  busy = true;
+  existing.result.classList.add('hidden');
+  existing.activity.classList.remove('hidden');
+  existing.stage.textContent = repair ? 'Repairing project' : 'Validating project';
+  existing.detail.textContent = 'Preparing the settings backup.';
+  const started = Date.now();
+  const tick = () => { const seconds = Math.floor((Date.now() - started) / 1000); existing.elapsed.textContent = `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s elapsed`; };
+  tick();
+  const timer = setInterval(tick, 1000);
+  let unlisten;
+  updateControls();
+  try {
+    unlisten = await window.__TAURI__.event.listen('existing-progress', event => { existing.detail.textContent = event.payload.detail; });
+    const result = await invoke('run_existing_project', { request: { projectPath: reviewed.projectPath, fingerprint: reviewed.fingerprint, repair, approved: true } });
+    existing.result.className = `result${result.success ? ' success' : ''}`;
+    existing.result.innerHTML = `<strong>${result.success ? 'Validation passed' : 'Needs attention'}</strong><br>${escapeHtml(result.message)}<br>Backup: ${escapeHtml(result.backupPath)}<br>Report: ${escapeHtml(result.reportPath)}`;
+    if (result.success) { existingCompleted = result.projectPath; document.querySelector('#open-existing-button').classList.remove('hidden'); }
+  } catch (error) { existing.result.className = 'result'; existing.result.textContent = String(error); }
+  finally {
+    if (unlisten) unlisten();
+    clearInterval(timer);
+    existing.activity.classList.add('hidden');
+    existingReport = null;
+    existing.approval.checked = false;
+    busy = false;
+    updateControls();
+  }
+}
+repairButton.addEventListener('click', () => runExisting(true));
+validateButton.addEventListener('click', () => runExisting(false));
+document.querySelector('#open-existing-button').addEventListener('click', async () => {
+  if (!existingCompleted || busy || opening) return;
+  opening = true; updateControls();
+  try { await invoke('open_project', { path: existingCompleted }); }
+  catch (error) { existing.result.className = 'result'; existing.result.textContent = String(error); }
+  finally { opening = false; updateControls(); }
+});

@@ -113,6 +113,25 @@ button { border: 0; border-radius: 5px; color: #eef4f5; }
 .progress-steps .done { color: var(--green); }
 .progress-steps .current { color: var(--cyan); font-weight: 700; }
 .elapsed-time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.mode-tabs { display: flex; gap: 24px; margin: 0 0 28px; border-bottom: 1px solid var(--line); }
+.mode-tabs button { background: none; border-radius: 0; padding: 10px 0; border-bottom: 2px solid transparent; color: var(--muted); }
+.mode-tabs button[aria-selected="true"] { color: var(--cyan); border-bottom-color: var(--cyan); }
+.preview-label { color: var(--amber); font-size: 10px; font-weight: 700; }
+h3 { font-size: 15px; margin: 24px 0 12px; }
+.inspection-finding { padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 12px; overflow-wrap: anywhere; }
+.inspection-finding strong { display: block; margin-bottom: 3px; }
+.inspection-finding p { margin: 0; color: var(--muted); line-height: 1.5; }
+.inspection-finding.pass strong { color: var(--green); }
+.inspection-finding.blocked strong { color: var(--red); }
+.inspection-finding.repair strong { color: var(--amber); }
+.inspection-finding.check strong { color: var(--cyan); }
+#repair-plan { margin-top: 22px; font-size: 12px; line-height: 1.6; }
+#repair-plan summary { font-weight: 700; cursor: pointer; }
+#repair-changes { padding-left: 18px; max-height: 240px; overflow-y: auto; overflow-wrap: anywhere; }
+.approval-label { display: flex; align-items: flex-start; gap: 8px; line-height: 1.55; }
+.approval-label input { margin-top: 3px; flex: 0 0 auto; accent-color: var(--cyan); }
+.hub-result { font-size: 12px; margin-top: 12px; color: var(--green); line-height: 1.55; overflow-wrap: anywhere; }
+.hub-result.pending { color: var(--amber); }
 .result.success { border-left-color: var(--green); }
 .result { overflow-wrap: anywhere; }
 .result strong { color: #fff; }
