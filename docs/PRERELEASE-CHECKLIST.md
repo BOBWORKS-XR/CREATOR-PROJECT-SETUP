@@ -1,8 +1,17 @@
 # Windows 0.3.0-alpha.1 Candidate
 
-This is preparation for a coordinated prerelease, not publication approval.
-Stable 0.2.2 remains unchanged. The candidate does not advertise installed hosting,
-shortcut adoption, SDK migration, or unattended installation.
+This records the preparation and acceptance history for the published
+[Setup 0.3.0-alpha.1 prerelease](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.3.0-alpha.1).
+Stable 0.2.2 remains unchanged. Earlier local preparation results below are not
+retroactive evidence for the final files.
+
+The optional [Creator Hub 0.1.0-alpha.3 prerelease](https://github.com/BOBWORKS-XR/CREATOR-HUB/releases/tag/v0.1.0-alpha.3)
+provides the install-first route. Its
+[native suite matrix](https://github.com/BOBWORKS-XR/CREATOR-HUB/actions/runs/34536443333)
+passed clean-install, older-app upgrade and MCP-only flows with the unchanged
+published Setup/MCP files. MCP does not require Setup. Hosted-interface acceptance
+does not establish persistent shortcut adoption, SDK migration, Hub self-update,
+or unattended installation.
 
 ## Candidate Workflow
 
@@ -156,14 +165,14 @@ installed EXE hashes, OS/user scope, exit codes, logs, and before/after snapshot
 
 | Scenario | Required evidence | Current gate |
 | --- | --- | --- |
-| Fresh install and standalone launch | Installed identity matches extracted hash; normal GUI opens; uninstall registration correct | Candidate standalone launch passed after upgrade; isolated fresh-candidate install remains a Hub suite gate |
+| Fresh install and standalone launch | Installed identity matches extracted hash; normal GUI opens; uninstall registration correct | Standalone launch passed after upgrade; Hub native clean-install and hosted-interface route also passed |
 | Closed 0.2.2 to candidate | Legitimate preferences and project receipts preserved; no duplicate installation | Default-path upgrade passed with synthetic sentinels; real preferences/receipts untested |
 | Running 0.2.2 upgrade, GUI and silent | Refuses before invoking old uninstaller; old process survives; no changed files/registration | Owned same-name process refusal and unchanged snapshots passed; real busy app untested |
 | Candidate busy creating/repairing | Upgrade and uninstall refuse; operation and Editor survive | Not run |
 | Cancelled/failed upgrade | Prior app remains usable; no false success or deleted settings | Not run |
 | Portable plus installed copies/custom location | Explicit selection; unrelated copies and content untouched | Not run |
 | Reinstall and uninstall | Only owned installation removed; Unity projects and user settings retained as documented | Not run |
-| Hub open/download/install/readback | Descriptor, approvals, version/hash readback, and refusal behavior agree | Not run |
+| Hub open/download/install/readback | Descriptor, approvals, version/hash readback, and refusal behavior agree | Native clean/older-app/MCP-only matrix passed; exact installed hashes, fixture preservation, consent, hosted state and busy-close refusal checked |
 
 Run these on the packaged bits after all source changes land. A clean build,
 metadata pass, or browser mock cannot promote `installerProtocol` to 1.

@@ -11,10 +11,19 @@ been exercised on real machines.
 
 ## Windows Prerelease: 0.3.0-alpha.1
 
-This is the Creator Hub compatibility testing branch. Check the
-[releases page](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases)
-for the coordinated Windows prerelease and exact test results. Stable users can
-continue using 0.2.2 below.
+This is the Creator Hub compatibility testing branch. The coordinated Windows
+prereleases are published; stable users can continue using 0.2.2 below.
+
+**Start with [Creator Hub 0.1.0-alpha.3](https://github.com/BOBWORKS-XR/CREATOR-HUB/releases/tag/v0.1.0-alpha.3)**
+to install or update the Creator apps you need, then open their hosted interfaces
+inside Hub. Downloads are verified and installation requires your approval.
+Creator Works MCP does not require Project Setup: an existing Unity project can
+use MCP on its own. Install Project Setup when you need its project-creation or
+reviewed validation/repair workflow.
+
+For standalone use, get the
+[Project Setup 0.3.0-alpha.1 installer or portable ZIP](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.3.0-alpha.1).
+Hub is optional. Keep the included `licenses` folder with the portable app.
 
 - Compact interface and shared Creator app navigation.
 - Read-only app identity for Creator Hub and a local embedded-Setup preview.
@@ -27,9 +36,13 @@ continue using 0.2.2 below.
 
 The coordinated suite includes [Creator Hub](https://github.com/BOBWORKS-XR/CREATOR-HUB)
 and [Creator Works MCP](https://github.com/BOBWORKS-XR/CREATOR-WORKS-UNITY-MCP).
-Setup remains usable standalone. Persistent Hub adoption and shortcut takeover
-are not advertised by this Setup candidate. The installer tests do not prove
-real user-settings migration, unattended Unity upgrades, or headset behavior.
+The [native suite tests](https://github.com/BOBWORKS-XR/CREATOR-HUB/actions/runs/34536443333)
+passed for clean installations, existing older apps, and MCP without Setup.
+They cover verified installs/upgrades, installed-file hashes, fixture settings
+preservation, hosted interfaces, and refusal to close Hub during a folder-picker
+operation. Persistent Hub adoption and shortcut takeover are not advertised.
+These tests do not prove every historical upgrade, real user-settings migration,
+Hub self-update, unattended Unity upgrades, or headset behavior.
 Windows installers remain unsigned for Windows publisher/SmartScreen purposes;
 verified download metadata is a separate check, not an Authenticode signature.
 See the [testing guide](docs/PRERELEASE-TESTING.md) and
@@ -202,7 +215,7 @@ the exact accepted Windows candidate is uploaded with its checksums. The separat
 workflow runs native/browser tests, checks the EXE extracted from the installer,
 and stages hashes and an unsigned Hub descriptor without publishing or installing.
 See the [prerelease checklist](docs/PRERELEASE-CHECKLIST.md) for commands and the
-installed-upgrade tests still required before distribution.
+installed-upgrade evidence and remaining test limits.
 
 ## Roadmap
 

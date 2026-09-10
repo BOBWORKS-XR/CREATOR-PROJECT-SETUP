@@ -15,9 +15,17 @@ this release is not marked as the stable/latest release.
 
 ## Installation and Testing
 
-Use the Windows installer, or extract the portable ZIP and run its EXE. Keep the
-included `licenses` folder with the portable app. The installer places notices
-in its own `licenses` folder.
+For the integrated route, install and open
+[Creator Hub 0.1.0-alpha.3](https://github.com/BOBWORKS-XR/CREATOR-HUB/releases/tag/v0.1.0-alpha.3),
+choose Project Setup, and approve its verified installation or update. Open its
+hosted view after installation. Install MCP separately only when you need it;
+MCP can also be used with an existing Unity project without installing Setup.
+
+For standalone use, get this release's
+[Windows installer or portable ZIP](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.3.0-alpha.1).
+Extract the ZIP and run its EXE, keeping the included `licenses` folder with the
+portable app. The installer places notices in its own `licenses` folder.
+Neither standalone app requires Hub.
 
 Close Setup normally before updating from 0.2.2. Updates require approval.
 Stable-to-newer-prerelease and prerelease-to-newer-stable are forward upgrades;
@@ -43,9 +51,17 @@ and [installed upgrade acceptance](https://github.com/BOBWORKS-XR/CREATOR-PROJEC
 passed for these exact files. Native regression tests: 35 passed, with four
 explicit live Unity/Hub tests not run. Browser interface tests: 32 passed.
 
+Subsequent [Creator Hub native suite acceptance](https://github.com/BOBWORKS-XR/CREATOR-HUB/actions/runs/34536443333)
+passed clean-install, older-app upgrade, and MCP-only routes using these unchanged
+Setup files and the published Hub candidate. It checks real verified installation,
+installed hashes, fixture preservation, hosted interfaces and consent, retained
+form state, folder-picker cancellation, and explicit refusal to close Hub while
+an operation is active. The MCP-only route leaves Setup uninstalled.
+
 These checks do not establish migration of real user settings or project receipts,
-historical uninstaller safety, busy Unity creation/repair, full Hub adoption,
-headset behavior, published multiplayer spaces, or native macOS/Linux acceptance.
+the safety of every historical uninstaller, busy Unity creation/repair, full Hub
+adoption or self-update, headset behavior, published multiplayer spaces, or native
+macOS/Linux acceptance.
 Hosted development previews retain their preview status. Setup remains usable
 standalone; persistent shortcut takeover is not advertised.
 

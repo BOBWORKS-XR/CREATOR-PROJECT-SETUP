@@ -4,6 +4,13 @@ Use the prerelease assets from the three repositories, not old stable installers
 or a random local development build. Each release must identify its tested source,
 installer hashes, checksums and remaining limits. The suite is not yet a stable release.
 
+Start with [Creator Hub 0.1.0-alpha.3](https://github.com/BOBWORKS-XR/CREATOR-HUB/releases/tag/v0.1.0-alpha.3).
+It can install the matching
+[Project Setup 0.3.0-alpha.1](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.3.0-alpha.1)
+and [Creator Works MCP 2.7.0-alpha.1](https://github.com/BOBWORKS-XR/CREATOR-WORKS-UNITY-MCP/releases/tag/v2.7.0-alpha.1)
+after approval. Both apps remain usable standalone. MCP does not depend on Setup;
+use the MCP-only route below when you already have a Unity project.
+
 ## Test Safely
 
 - Use a disposable Windows account or a backed-up test machine for installer testing.
@@ -18,13 +25,14 @@ installer hashes, checksums and remaining limits. The suite is not yet a stable 
 
 ## Main Test Route
 
-1. Install and open the Creator Hub prerelease. Check that it opens without errors.
+1. Install and open the linked Creator Hub prerelease. Check that it opens without errors.
 2. Check whether Hub detects existing Creator apps, and compare displayed versions
    with their app/release versions. Do not approve an unexpected replacement path.
 3. Use the supported install/update actions for MCP and Project Setup. If Hub says
    an action is unavailable, capture the reason; do not bypass verification or invent
    registry entries. Hosting/adoption and self-update have separate acceptance gates.
-4. Open Project Setup. Confirm required Android and Windows modules are detected.
+4. Open Project Setup in Hub and approve the hosted-view prompt. Confirm required
+   Android and Windows modules are detected.
    Create a disposable Creator SDK project and wait for validation to complete.
 5. Open that project in Unity and check for compile errors or a Visual Scripting
    initialization prompt. Inspect its `.creator-project-setup` logs and receipt.
@@ -35,6 +43,14 @@ installer hashes, checksums and remaining limits. The suite is not yet a stable 
    a launcher success message proves the full task worked.
 
 ## Additional Routes
+
+### Existing Project or MCP Only
+
+Install Hub, select Creator Works MCP, and approve its installation or supported
+update. Open the hosted MCP view and approve the native controls prompt. Verify
+the saved project list and active project, then test a small scene read in a
+backed-up Unity project. Project Setup should remain uninstalled unless you
+choose to install it. Standalone MCP remains an alternative without Hub.
 
 ### Stable and Prerelease Channels
 
@@ -72,7 +88,14 @@ excerpt. A screenshot of the final message alone is not proof of successful setu
 
 ## What Automated Tests Do Not Establish
 
+The [native Hub matrix](https://github.com/BOBWORKS-XR/CREATOR-HUB/actions/runs/34536443333)
+passed clean-install, older-app upgrade and MCP-only routes against unchanged
+release binaries. These are real Windows install/hosted-interface checks, including
+fixture preservation, native consent, retained form state and busy-close refusal;
+they do not run Unity project creation or repair.
+
 Installed tests use synthetic preservation markers, not real user preferences or
 valuable Unity projects. Browser mocks are not native Hub hosting tests. No claim
-is made here of completed Windows/Android player builds, published spaces, working
-multiplayer, acceptable headset performance, or native macOS/Linux validation.
+is made here of Hub self-update, completed Windows/Android player builds, published
+spaces, working multiplayer, acceptable headset performance, or native macOS/Linux
+validation.
