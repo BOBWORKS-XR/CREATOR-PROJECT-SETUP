@@ -1,7 +1,10 @@
 # Optional Creator Works MCP Companion
 
-Status: coordinated proposal, not implemented in either installer. The Windows
-Setup app remains independent; this does not block the 0.2.2 preview release.
+Status: superseded as the primary direction by the approved optional Creator Hub
+approach. These companion notes remain useful constraints, but first-launch
+assistance should live in the Hub rather than be duplicated in every tool.
+The Windows Setup app remains independent. Hub compatibility belongs to the
+next version; the published 0.2.2 files remain unchanged.
 
 ## First Pass
 
@@ -21,13 +24,12 @@ Setup app remains independent; this does not block the 0.2.2 preview release.
 
 ## Distribution Boundary
 
-The Setup repository is currently private. Public MCP users cannot download its
-release assets anonymously; no access token should be embedded or requested as
-an installation shortcut. Keep a manually selected portable helper for this
-private preview. Public binary hosting or a visibility change needs a separate
-owner decision.
+The owner approved public distribution of this repository and the 0.2.2 Windows
+release. Public release downloads must work without GitHub accounts or access
+tokens. Never embed a token in a Hub or installer. A manually selected portable
+helper remains a useful offline option.
 
-Prefer a verified on-demand download after public distribution is approved.
+Prefer a verified on-demand download after a user chooses Install.
 Pin exact platform/version/size/hash in the MCP release initially. A future
 mutable manifest needs independent authentication with a pinned signing key;
 fetching an EXE and its checksum from the same mutable location alone does not

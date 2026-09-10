@@ -9,6 +9,18 @@ packaging support. Windows is the first physically tested platform; macOS and
 Linux packages remain preview quality until their full Unity workflows have
 been exercised on real machines.
 
+## Download 0.2.2
+
+[Download the Windows portable EXE](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/download/v0.2.2/Creator-Project-Setup-0.2.2-Windows.exe)
+or see the [0.2.2 release](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.2.2)
+for the optional installer, portable ZIP, checksums, and known limitations.
+No GitHub account is required. The Windows files are unsigned.
+
+The tested 0.2.2 Windows files were promoted unchanged from prerelease after the
+Hub restart also passed user testing. Their existing footer still says Preview;
+this is not a different download. Existing-project repair remains experimental,
+and native macOS/Linux Unity workflows are not yet accepted as tested.
+
 ## Current Recipe
 
 - Unity Editor `6000.3.21f1`
@@ -58,7 +70,7 @@ or Android APK, uploaded a space, or tested interaction in a headset.
 Setup logs and receipts are kept in `.creator-project-setup` inside the created
 project. The temporary Editor validator is removed after successful creation.
 
-## 0.2.2 Preview
+## 0.2.2 Release
 
 ### Automatic Unity Hub Registration
 
@@ -166,8 +178,9 @@ Windows, macOS, and Linux by GitHub Actions.
 See [docs/PLAN.md](docs/PLAN.md). Existing-project repair is a separate preview
 workflow; optional Creator Works MCP installation follows later and is not
 required for SDK correctness.
-The coordinated [optional MCP companion proposal](docs/MCP-INTEGRATION.md) keeps
-first-launch assistance and later manual access separate from MCP connection.
+The coordinated [MCP integration notes](docs/MCP-INTEGRATION.md) now point toward
+an optional Creator Hub for installing, opening, and updating independent tools.
+Hub compatibility is next-version work, not a feature of the 0.2.2 download.
 
 ## License
 

@@ -1,8 +1,13 @@
-# Creator Project Setup 0.2.2 - Windows Preview
+# Creator Project Setup 0.2.2 - Windows Release
 
 A portable setup tool for creating and validating a SideQuest Creator SDK Unity
 project without editing package manifests, dragging package files, or using Git
 or a terminal.
+
+Promoted from prerelease after automated checks, native packaged-app testing,
+and user confirmation that Restart Unity Hub made the project visible. The
+original tested downloads and checksums are unchanged; the app footer still
+says Preview. Existing-project repair remains experimental.
 
 ## New In This Build
 
@@ -49,8 +54,8 @@ Clippy with warnings treated as errors.
 Finish Hub downloads/installations before confirming a restart. A refused
 shutdown stops without forcing it. The app does not inspect every user's Hub UI.
 
-This remains a **Windows preview**, not a guarantee for arbitrary SDK versions,
-existing projects, player builds, hosted spaces or headset behavior. Existing
+This is a **Windows release for the tested recipe**, not a guarantee for arbitrary
+SDK versions, existing projects, player builds, hosted spaces or headset behavior. Existing
 repair backs up settings/manifests/generated Visual Scripting data, not the whole
 project; retain your own full backup. macOS/Linux automatic restart is not
 implemented; their native workflows remain unverified. Unity sign-in, licensing
@@ -61,5 +66,6 @@ preflight is not yet implemented; a disk-full test stopped with Unity's log
 retained, but the UI currently reports a generic setup failure.
 
 The Windows files are **unsigned**. Only run trusted copies and compare the
-published checksums. Creator Works MCP integration is being planned separately;
-this release does not install or reconfigure the MCP.
+published checksums. Optional Creator Hub support for installing, opening, and
+updating the independent tools is next-version work. This release does not
+install or reconfigure the MCP and does not contain Hub integration.
