@@ -19,6 +19,8 @@ Run locally from PowerShell 7 after installing the repository dependencies:
 
 ```powershell
 $env:CARGO_TARGET_DIR = "$PWD\dist\prerelease-target"
+git clone --no-checkout https://github.com/BOBWORKS-XR/CREATOR-HUB.git dist/notices-tool
+git -C dist/notices-tool checkout --detach c1faf51ef6f9c0f1a056f59c1219214fee2bc44e
 node --test scripts/verify-windows-candidate.test.cjs
 cargo test --release --locked --manifest-path src-tauri/Cargo.toml
 npx playwright test --output dist/candidate-ui-tests
@@ -26,6 +28,12 @@ npx playwright test --output dist/candidate-ui-tests
 ```
 
 Use a dedicated target directory; do not reuse another task's active build.
+The notice-tool clone step is only needed for a fresh checkout. Its revision is
+pinned in `scripts/notices-tool.json` and the CI workflow. The common collector
+uses original crate notices and version/commit/hash-pinned upstream supplements.
+Release-only Tauri configuration packages the generated MIT app licence,
+third-party texts, and inventory into `licenses/`; regular development does not
+require generated release resources.
 The build script saves the portable EXE **before** NSIS bundling. It then uses
 7-Zip to extract the installed EXE, probes both with the exact metadata command,
 checks rejection of unsupported Hub commands, and records all three hashes.
@@ -36,6 +44,7 @@ Outputs under the fresh candidate directory:
 
 - `Creator-Project-Setup-0.3.0-alpha.1-Windows-setup.exe`
 - `Creator-Project-Setup-0.3.0-alpha.1-Windows.exe` (portable)
+- `Creator-Project-Setup-0.3.0-alpha.1-Windows-portable.zip` (portable plus licences)
 - `installed-payload/creator-project-setup.exe` (verification evidence)
 - `creator-hub-windows-x86_64.UNSIGNED.json` (descriptor draft, not loadable release metadata)
 - `candidate-report.json`, `guard-report.json`, and `SHA256SUMS.txt`
@@ -45,10 +54,24 @@ are development evidence only. CI test logs accompany the candidate but are not
 replaced by the artifact-check report. An incomplete or failed job is not a
 candidate to distribute, even when diagnostic artifacts were uploaded.
 
+Publish the portable ZIP, not a bare portable EXE without its notices. Extraction
+checks compare all three notice files to the generator output in both installer
+and ZIP, and compare the ZIP's executable to the tested portable. Installed
+acceptance also compares the resulting installed notice hashes.
+
+Source cleanliness is determined by actual Git-normalized HEAD/index content
+differences and nonignored untracked files. Raw status is retained separately:
+Windows build tools can rewrite line endings without a Git content difference.
+Regression tests still reject staged, unstaged, deleted and untracked source.
+Historical reports are not changed retroactively.
+
 Identity protocol 1 is derived only from the exact native metadata/rejection
 checks. Lifecycle and installer protocols remain 0. Minimum planned Hub version
 is `0.1.0-alpha.3`. The unsigned descriptor contains no hosting extension.
-Signing/publication remain the coordinated Hub release task's responsibility.
+The coordinated Hub publisher may attest a narrowly tested installer route in
+its signed descriptor after reviewing the exact acceptance receipt; this is
+not blanket historical installer safety or general hosted/adoption support.
+Signing remains the coordinated Hub release task's responsibility.
 
 ## Local Preparation Evidence (2026-09-10)
 
@@ -78,6 +101,8 @@ GitHub-hosted Windows runner**. The script refuses local/self-hosted execution.
 It reuses the successful candidate run and exact installer/payload hashes in
 `scripts/installed-acceptance-pin.json`; it does not rebuild or alter that artifact.
 Changing the pin is an explicit review step, not automatic selection of latest.
+Final release acceptance requires source-clean and licence-complete candidate
+evidence. The earlier development fixture remains historical evidence only.
 
 The fixture downloads the hash-pinned public 0.2.2 NSIS installer, installs it in
 the default per-user directory, snapshots files/data/registry values, and tests

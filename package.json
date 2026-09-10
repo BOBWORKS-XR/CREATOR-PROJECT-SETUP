@@ -2,6 +2,7 @@
   "name": "creator-project-setup",
   "version": "0.3.0-alpha.1",
   "private": true,
+  "license": "MIT",
   "description": "Portable Creator SDK Unity project setup and validation",
   "scripts": {
     "dev": "tauri dev",

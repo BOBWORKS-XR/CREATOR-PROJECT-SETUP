@@ -9,16 +9,33 @@ packaging support. Windows is the first physically tested platform; macOS and
 Linux packages remain preview quality until their full Unity workflows have
 been exercised on real machines.
 
-## Download 0.2.2
+## Windows Prerelease: 0.3.0-alpha.1
 
-Development branch: `0.3.0-alpha.1` adds read-only Creator Hub identity, a compact
-shared interface and a local preview of Setup running inside Creator Hub. Real
-creation/reopen and isolated repair checks have passed. Installer preflight now
-also checks before the old-uninstaller selection page; full installed-upgrade
-acceptance is still pending. Persistent Hub adoption and standalone shortcut
-handoff are not yet implemented. See [the Hub plan](docs/CREATOR-HUB-PLAN.md) and
-[the UI preview notes](docs/UI-PREVIEW.md).
-These changes are not included in the stable download below.
+This is the Creator Hub compatibility testing branch. Check the
+[releases page](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases)
+for the coordinated Windows prerelease and exact test results. Stable users can
+continue using 0.2.2 below.
+
+- Compact interface and shared Creator app navigation.
+- Read-only app identity for Creator Hub and a local embedded-Setup preview.
+- Early installer refusal while Setup is running; it does not force-close work.
+- Installed Windows update tests: public 0.2.2 to the candidate, refusal without
+  changed files/registration, payload hashes, synthetic preservation sentinels,
+  and real app-window startup and normal close.
+- Existing new-project creation, Visual Scripting initialization and reviewed
+  repair workflows remain available. Android and Windows support stay required.
+
+The coordinated suite includes [Creator Hub](https://github.com/BOBWORKS-XR/CREATOR-HUB)
+and [Creator Works MCP](https://github.com/BOBWORKS-XR/CREATOR-WORKS-UNITY-MCP).
+Setup remains usable standalone. Persistent Hub adoption and shortcut takeover
+are not advertised by this Setup candidate. The installer tests do not prove
+real user-settings migration, unattended Unity upgrades, or headset behavior.
+Windows installers remain unsigned for Windows publisher/SmartScreen purposes;
+verified download metadata is a separate check, not an Authenticode signature.
+See the [testing guide](docs/PRERELEASE-TESTING.md) and
+[prerelease evidence checklist](docs/PRERELEASE-CHECKLIST.md).
+
+## Stable Download: 0.2.2
 
 [Download the Windows portable EXE](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/download/v0.2.2/Creator-Project-Setup-0.2.2-Windows.exe)
 or see the [0.2.2 release](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.2.2)
@@ -179,8 +196,9 @@ npm run test:ui
 npm run dev
 ```
 
-Build a native package with `npm run build`. Tagged builds are packaged for
-Windows, macOS, and Linux by GitHub Actions. The separate Windows candidate
+Build a native package with `npm run build`. Non-prerelease tags are packaged for
+Windows, macOS, and Linux by GitHub Actions. Prerelease tags do not rebuild assets:
+the exact accepted Windows candidate is uploaded with its checksums. The separate Windows candidate
 workflow runs native/browser tests, checks the EXE extracted from the installer,
 and stages hashes and an unsigned Hub descriptor without publishing or installing.
 See the [prerelease checklist](docs/PRERELEASE-CHECKLIST.md) for commands and the
@@ -193,7 +211,7 @@ workflow; optional Creator Works MCP installation follows later and is not
 required for SDK correctness.
 The coordinated [MCP integration notes](docs/MCP-INTEGRATION.md) now point toward
 an optional Creator Hub for installing, opening, and updating independent tools.
-Hub compatibility is next-version work, not a feature of the 0.2.2 download.
+Hub compatibility is prerelease work, not a feature of the 0.2.2 download.
 See the [approved Creator Hub plan](docs/CREATOR-HUB-PLAN.md) for app ownership,
 the metadata contract, update discovery, installation safeguards and release gates.
 

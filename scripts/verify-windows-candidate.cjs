@@ -78,19 +78,55 @@ function requireExe(file) {
   } finally { fs.closeSync(fd); }
 }
 
-function git(args) {
-  const result = spawnSync('git', args, { cwd: repo, encoding: 'utf8', timeout: 10000, maxBuffer: 1024 * 1024, windowsHide: true });
+const noticeNames = ['LICENSE.txt', 'THIRD_PARTY_NOTICES.txt', 'rust-dependencies.json'];
+async function verifyNotices(expected, installed) {
+  const records = [];
+  for (const name of noticeNames) {
+    const source = path.join(expected, name);
+    const target = path.join(installed, 'licenses', name);
+    for (const file of [source, target]) {
+      const stat = fs.lstatSync(file);
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.size === 0 || stat.size > 20 * 1024 * 1024) {
+        throw Error('Missing or invalid packaged license notice.');
+      }
+    }
+    const sha256 = await hash(source);
+    if (sha256 !== await hash(target)) throw Error(`Packaged notice differs from its generated source: ${name}`);
+    records.push({ name: `licenses/${name}`, sha256, byteLength: fs.statSync(target).size });
+  }
+  const inventory = JSON.parse(fs.readFileSync(path.join(installed, 'licenses/rust-dependencies.json'), 'utf8'));
+  if (inventory.schemaVersion !== 1 || inventory.platform !== 'windows-x86_64' || !Array.isArray(inventory.packages) || !inventory.packages.length) {
+    throw Error('Packaged dependency inventory is empty or invalid.');
+  }
+  return { files: records, rustDependencyCount: inventory.packages.length };
+}
+
+function git(args, directory = repo) {
+  const result = spawnSync('git', args, { cwd: directory, encoding: 'utf8', timeout: 10000, maxBuffer: 1024 * 1024, windowsHide: true });
   if (result.error || result.status !== 0) throw Error('Cannot record candidate source revision.');
   return result.stdout.trim();
 }
 
+function sourceState(directory = repo) {
+  // Windows builders can rewrite LF/CRLF and leave status stat-cache entries marked M.
+  // Use Git's actual HEAD content comparison; retain raw status as diagnostic evidence.
+  const sourceRevision = git(['rev-parse', 'HEAD'], directory);
+  const sourceStatus = git(['status', '--porcelain', '--untracked-files=normal'], directory);
+  const sourceTrackedChanges = git(['diff', '--no-ext-diff', '--no-textconv', '--name-only', 'HEAD', '--'], directory);
+  const sourceStagedChanges = git(['diff', '--no-ext-diff', '--no-textconv', '--cached', '--name-only', 'HEAD', '--'], directory);
+  const sourceUntrackedFiles = git(['ls-files', '--others', '--exclude-standard'], directory);
+  const sourceDiffStat = git(['diff', '--no-ext-diff', '--no-textconv', 'HEAD', '--stat'], directory);
+  return { sourceRevision, sourceDirty: Boolean(sourceTrackedChanges || sourceStagedChanges || sourceUntrackedFiles),
+    sourceStatus, sourceTrackedChanges, sourceStagedChanges, sourceUntrackedFiles, sourceDiffStat };
+}
+
 async function main() {
   const { values } = parseArgs({ options: Object.fromEntries(
-    ['installer', 'portable', 'seven-zip', 'output', 'guard-report'].map(key => [key, { type: 'string' }]),
+    ['installer', 'portable', 'seven-zip', 'output', 'guard-report', 'licenses'].map(key => [key, { type: 'string' }]),
   ) });
   if (process.platform !== 'win32' || process.arch !== 'x64') throw Error('Native candidate verification requires Windows x64.');
-  if (Object.values(values).length !== 5 || Object.values(values).some(value => !value)) {
-    throw Error('Required: --installer FILE --portable FILE --seven-zip EXE --output NEW-DIRECTORY --guard-report FILE');
+  if (Object.values(values).length !== 6 || Object.values(values).some(value => !value)) {
+    throw Error('Required: --installer FILE --portable FILE --seven-zip EXE --output NEW-DIRECTORY --guard-report FILE --licenses DIRECTORY');
   }
   const version = JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')).version;
   if (!/^\d+\.\d+\.\d+-[0-9A-Za-z.-]+$/.test(version)) throw Error('This script only stages prerelease candidates.');
@@ -100,10 +136,7 @@ async function main() {
   const guardPath = path.resolve(values['guard-report']);
   const guard = JSON.parse(fs.readFileSync(guardPath, 'utf8').replace(/^\uFEFF/, ''));
   validateGuard(guard, await hash(path.join(repo, 'src-tauri/windows/installer-hooks.nsh')));
-  const sourceRevision = git(['rev-parse', 'HEAD']);
-  const sourceStatus = git(['status', '--porcelain', '--untracked-files=normal']);
-  const sourceDirty = sourceStatus !== '';
-  const sourceDiffStat = git(['diff', 'HEAD', '--stat']);
+  const source = sourceState();
   fs.mkdirSync(output, { recursive: true });
   const installerName = `Creator-Project-Setup-${version}-Windows-setup.exe`;
   const portableName = `Creator-Project-Setup-${version}-Windows.exe`;
@@ -111,20 +144,38 @@ async function main() {
   fs.copyFileSync(values.portable, path.join(output, portableName), fs.constants.COPYFILE_EXCL);
   const extracted = path.join(output, 'installed-payload');
   fs.mkdirSync(extracted);
-  // Extract only the installed app, never run the installer or its uninstaller.
+  // Extract the payload and notices; never run the installer or its uninstaller.
   const extraction = spawnSync(path.resolve(values['seven-zip']),
-    ['e', '-y', '-r', `-o${extracted}`, path.join(output, installerName), 'creator-project-setup.exe'],
+    ['x', '-y', '-r', `-o${extracted}`, path.join(output, installerName)],
     { encoding: 'utf8', timeout: 60000, maxBuffer: 1024 * 1024, windowsHide: true });
   if (extraction.error || extraction.status !== 0) throw Error('NSIS application extraction failed.');
   const extractedExe = path.join(extracted, 'creator-project-setup.exe');
   requireExe(extractedExe);
+  const notices = await verifyNotices(path.resolve(values.licenses), extracted);
+  const portableRoot = path.join(output, 'portable-package');
+  fs.mkdirSync(path.join(portableRoot, 'licenses'), { recursive: true });
+  fs.copyFileSync(values.portable, path.join(portableRoot, 'creator-project-setup.exe'));
+  for (const name of noticeNames) fs.copyFileSync(path.join(extracted, 'licenses', name), path.join(portableRoot, 'licenses', name));
+  const portableZip = `Creator-Project-Setup-${version}-Windows-portable.zip`;
+  const archive = spawnSync(path.resolve(values['seven-zip']), ['a', '-tzip', '-r', path.join(output, portableZip), '.\\*'],
+    { cwd: portableRoot, encoding: 'utf8', timeout: 60000, maxBuffer: 1024 * 1024, windowsHide: true });
+  if (archive.error || archive.status !== 0) throw Error('Portable ZIP with license notices could not be created.');
+  const zipCheck = path.join(output, 'portable-zip-check');
+  const zipExtraction = spawnSync(path.resolve(values['seven-zip']), ['x', '-y', `-o${zipCheck}`, path.join(output, portableZip)],
+    { encoding: 'utf8', timeout: 60000, maxBuffer: 1024 * 1024, windowsHide: true });
+  if (zipExtraction.error || zipExtraction.status !== 0) throw Error('Portable ZIP verification extraction failed.');
+  await verifyNotices(path.resolve(values.licenses), zipCheck);
+  if (await hash(path.join(zipCheck, 'creator-project-setup.exe')) !== await hash(path.join(output, portableName))) {
+    throw Error('Portable ZIP executable differs from the tested portable.');
+  }
   const installedState = fs.mkdtempSync(path.join(output, 'probe-installed-'));
   const portableState = fs.mkdtempSync(path.join(output, 'probe-portable-'));
   const metadata = {
     installed: probe(extractedExe, version, spawnSync, installedState),
     portable: probe(path.join(output, portableName), version, spawnSync, portableState),
   };
-  const filenames = [installerName, portableName, 'installed-payload/creator-project-setup.exe'];
+  const filenames = [installerName, portableName, 'installed-payload/creator-project-setup.exe', portableZip,
+    ...noticeNames.map(name => `installed-payload/licenses/${name}`)];
   const files = [];
   for (const name of filenames) {
     const file = path.join(output, name);
@@ -134,9 +185,11 @@ async function main() {
   writeJson('creator-hub-windows-x86_64.UNSIGNED.json', descriptor(version, files[0], files[2]));
   writeJson('guard-report.json', guard);
   writeJson('candidate-report.json', {
-    schemaVersion: 1, version, sourceRevision, sourceDirty, sourceStatus, sourceDiffStat, recordedAt: new Date().toISOString(),
-    artifactChecksPassed: true, signed: false, files, metadata,
-    checks: { extractedInstalledExe: true, exactIdentity: true, unsupportedArgumentsRejected: true, noInstallGuardFixture: true },
+    schemaVersion: 1, version, ...source, recordedAt: new Date().toISOString(),
+    artifactChecksPassed: true, signed: false, files, metadata, notices,
+    noticeTool: JSON.parse(fs.readFileSync(path.join(__dirname, 'notices-tool.json'), 'utf8')),
+    checks: { extractedInstalledExe: true, exactIdentity: true, unsupportedArgumentsRejected: true, noInstallGuardFixture: true,
+      packagedLicenseNotices: true, portableZipVerified: true },
     notTested: ['Actual installation', 'Installed 0.2.2 upgrade', 'Installed busy upgrade/uninstall',
       'Installed settings and project preservation', 'Persistent Hub adoption', 'Native macOS/Linux acceptance'],
     publicationReady: false,
@@ -148,5 +201,5 @@ async function main() {
   process.stdout.write(`Candidate artifact checks passed: ${output}\nNot an installed-upgrade acceptance or publish approval.\n`);
 }
 
-module.exports = { validateInfo, validateGuard, probe, descriptor, hash, requireExe };
+module.exports = { validateInfo, validateGuard, probe, descriptor, hash, requireExe, sourceState, verifyNotices };
 if (require.main === module) main().catch(error => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });

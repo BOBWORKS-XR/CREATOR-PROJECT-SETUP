@@ -4,6 +4,12 @@ on:
   workflow_dispatch:
   push:
     branches: [hub-compatibility]
+    paths-ignore:
+      - '**/*.md'
+      - .github/workflows/windows-installed-acceptance.yml
+      - scripts/Test-InstalledCandidate.ps1
+      - scripts/installed-acceptance-pin.json
+      - scripts/owned-setup-fixture*
   pull_request:
     branches: [main]
 
@@ -24,6 +30,13 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - name: Checkout pinned notice tooling
+        uses: actions/checkout@v6
+        with:
+          repository: BOBWORKS-XR/CREATOR-HUB
+          ref: c1faf51ef6f9c0f1a056f59c1219214fee2bc44e
+          path: dist/notices-tool
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -35,6 +48,8 @@ jobs:
         with:
           workspaces: src-tauri -> ../dist/prerelease-target
       - run: npm ci
+      - name: Test shared notice collector
+        run: node --test dist/notices-tool/scripts/collect-rust-notices.test.cjs
       - name: Test artifact contract
         shell: pwsh
         run: |

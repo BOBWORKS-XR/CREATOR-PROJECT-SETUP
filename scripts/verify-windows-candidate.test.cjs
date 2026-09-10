@@ -3,7 +3,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { validateInfo, validateGuard, probe, descriptor } = require('./verify-windows-candidate.cjs');
+const { spawnSync } = require('node:child_process');
+const { validateInfo, validateGuard, probe, descriptor, sourceState, verifyNotices } = require('./verify-windows-candidate.cjs');
 const version = '0.3.0-alpha.1';
 const info = { schemaVersion: 1, appId: 'creator-project-setup', displayName: 'Creator Project Setup', version,
   platform: 'windows', architecture: 'x86_64', capabilities: ['launch.standalone'] };
@@ -80,4 +81,73 @@ test('descriptor uses extracted installed hash and never promotes lifecycle or i
   assert.equal(value.installerProtocol, 0);
   assert.equal(value.minHubVersion, '0.1.0-alpha.3');
   assert.equal(Object.keys(value).length, 14);
+});
+
+test('source evidence accepts Git-normalized line endings but rejects real or untracked changes', t => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'setup-source-state-'));
+  t.after(() => {
+    assert.equal(path.dirname(path.resolve(directory)), path.resolve(os.tmpdir()));
+    assert.ok(path.basename(directory).startsWith('setup-source-state-'));
+    fs.rmSync(directory, { recursive: true });
+  });
+  const git = (...args) => {
+    const result = spawnSync('git', args, { cwd: directory, encoding: 'utf8', windowsHide: true });
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout;
+  };
+  git('init');
+  git('config', 'core.autocrlf', 'true');
+  git('config', 'core.safecrlf', 'false');
+  const file = path.join(directory, 'source.txt');
+  fs.writeFileSync(file, 'first\nsecond\n');
+  fs.writeFileSync(path.join(directory, '.gitignore'), '/dist/\n');
+  git('add', '.');
+  git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-m', 'baseline');
+  assert.equal(sourceState(directory).sourceDirty, false);
+  fs.writeFileSync(file, 'first\r\nsecond\r\n');
+  assert.equal(sourceState(directory).sourceDirty, false);
+  fs.mkdirSync(path.join(directory, 'dist'));
+  fs.writeFileSync(path.join(directory, 'dist', 'build.log'), 'ignored generated output');
+  assert.equal(sourceState(directory).sourceDirty, false);
+  fs.writeFileSync(file, 'first\nchanged\n');
+  assert.equal(sourceState(directory).sourceDirty, true);
+  git('add', 'source.txt');
+  assert.equal(sourceState(directory).sourceDirty, true, 'staged changes must compare to HEAD, not the index');
+  fs.writeFileSync(file, 'first\nsecond\n');
+  assert.equal(sourceState(directory).sourceDirty, true, 'do not hide staged changes when the working file matches HEAD');
+  git('add', 'source.txt');
+  assert.equal(sourceState(directory).sourceDirty, false);
+  fs.writeFileSync(path.join(directory, 'new-source.txt'), 'untracked source');
+  const state = sourceState(directory);
+  assert.equal(state.sourceDirty, true);
+  assert.equal(state.sourceUntrackedFiles, 'new-source.txt');
+  fs.unlinkSync(file);
+  assert.match(sourceState(directory).sourceTrackedChanges, /source.txt/);
+});
+
+test('packaged notices must be complete and identical to the generated originals', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'setup-notices-test-'));
+  t.after(() => {
+    assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
+    assert.ok(path.basename(root).startsWith('setup-notices-test-'));
+    fs.rmSync(root, { recursive: true });
+  });
+  const expected = path.join(root, 'expected');
+  const installed = path.join(root, 'installed');
+  fs.mkdirSync(expected);
+  fs.mkdirSync(path.join(installed, 'licenses'), { recursive: true });
+  const files = { 'LICENSE.txt': 'MIT notice', 'THIRD_PARTY_NOTICES.txt': 'original notices',
+    'rust-dependencies.json': JSON.stringify({ schemaVersion: 1, platform: 'windows-x86_64', packages: [{ name: 'fixture', version: '1' }] }) };
+  for (const [name, text] of Object.entries(files)) {
+    fs.writeFileSync(path.join(expected, name), text);
+    fs.writeFileSync(path.join(installed, 'licenses', name), text);
+  }
+  const result = await verifyNotices(expected, installed);
+  assert.equal(result.files.length, 3);
+  assert.equal(result.rustDependencyCount, 1);
+  const notice = path.join(installed, 'licenses/THIRD_PARTY_NOTICES.txt');
+  fs.writeFileSync(notice, 'modified');
+  await assert.rejects(verifyNotices(expected, installed), /differs/);
+  fs.unlinkSync(notice);
+  await assert.rejects(verifyNotices(expected, installed));
 });

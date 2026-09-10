@@ -9,6 +9,9 @@ permissions:
 
 jobs:
   package:
+    # Prereleases publish the exact Windows candidate that passed installed acceptance.
+    # Do not silently rebuild different installers when that tested source is tagged.
+    if: ${{ !contains(github.ref_name, '-') }}
     name: Package ${{ matrix.label }}
     strategy:
       fail-fast: false
