@@ -76,3 +76,45 @@ Regression checks: 19 Rust unit tests and 16 frontend tests, including a legacy
 Hub failure gate that stops before any helper operation. Live native visibility
 after upgrading Hub remains an acceptance check; source compatibility alone is
 not recorded as a passed UI test.
+
+## 0.2.2 Running Hub Refresh (2026-09-10)
+
+- Hub 3.21.1 visibly omitted `F:\UnityTest\hubtest2`, although the official CLI
+  listed that exact path in its registry. Read-only inspection of the installed
+  Hub showed `loadProjects()` is called during initialization; ordinary refresh
+  recollects metadata for paths already in memory, not new database entries.
+- Closing the Hub window left its main process running in the system tray.
+- The application's new Windows Restart Manager routine was executed against
+  that Hub after user approval. It requested graceful shutdown of the verified
+  main Hub process only, with no force flag, then reopened Hub.
+- Native window capture confirmed `hubtest2` at the top of the Projects list.
+  The three pre-existing Unity Editor processes retained their process IDs;
+  the main Hub process changed from 62028 to 28972. No Editor was launched or
+  intentionally closed, and no project creation/repair ran during this check.
+- This closes the earlier native Hub visibility acceptance gap for this tested
+  Windows/Hub version. macOS/Linux automatic restart, busy-install handling,
+  and unresponsive-Hub behavior have not been tested live. The confirmation
+  explicitly asks users to finish downloads/installations before restarting.
+- Regression checks: 22 Rust tests passed (four live tests excluded from the
+  default suite), 21 Playwright UI tests passed, and Clippy passed with warnings
+  treated as errors. The separate live Hub restart test also passed. UI tests
+  cover successful, cancelled, failed and duplicate restart requests, disabled
+  conflicting controls, and manual instructions on non-Windows platforms.
+- The final portable 0.2.2 EXE also passed the complete native GUI workflow:
+  `CreatorSetupRelease-022` was created on a drive with available space, compiled,
+  initialized Visual Scripting, and passed the separate reopen validator. Its
+  receipt reported both required build targets supported and 172 Creator nodes;
+  neither Unity log contained a C# compilation error. The running Hub initially
+  omitted the project. Cancelling the native restart dialog left Hub PID 28972
+  unchanged; confirming replaced it with PID 55396. Native Hub capture then
+  showed the new project and its exact path at the top of Projects. All three
+  original Unity Editor process IDs remained unchanged throughout.
+- An earlier attempt on a full project drive failed with package extraction
+  `ENOSPC` errors. Its project and logs were retained; it was not reported as a
+  successful creation. Free-space preflight and a clearer disk-full message are
+  still needed. The successful retest used a different destination, not an
+  overwrite of that failed project.
+
+The app reports registry and restart outcomes separately. It does not claim to
+read back every user's visible Hub list, silently restart Hub, or overwrite its
+internal registry. Restart failure/cancellation preserves the completed project.

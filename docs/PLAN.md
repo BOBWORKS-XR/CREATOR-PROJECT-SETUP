@@ -26,6 +26,8 @@
   CLI records from UI visibility, and allow independent retry. Older Hubs keep the
   manual Add-from-disk route; do not present CLI-only records as desktop success.
 - Do not edit Hub's private database or silently link Unity Cloud.
+- Windows 0.2.2 adds an explicit confirmed Hub restart to reload the running
+  list; it never force-closes Hub or targets Unity Editors.
 
 Still required before promoting repair beyond preview: broader existing-project
 fixtures, recovery UX, third-party package callback coverage, and native
@@ -36,6 +38,16 @@ macOS/Linux acceptance. Backups are selective; failure recovery is manual.
 - Offer Creator Works MCP after the Unity project passes validation.
 - Keep MCP setup optional and independent from SDK correctness.
 - Verify the selected project and bridge version after setup.
+- Coordinate the reciprocal optional first-launch/manual Setup companion in
+  the MCP launcher. See [MCP-INTEGRATION.md](MCP-INTEGRATION.md); the initial
+  interface is an ordinary GUI launch and manual project selection, not IPC.
+
+## Next Safety Pass
+
+- Add project/cache volume free-space preflight and a clear disk-full failure.
+  A packaged 0.2.2 test on F: failed during UPM extraction with `ENOSPC`; Setup
+  preserved the failed folder/logs but only reported a generic Unity failure.
+  Do not auto-delete unrelated content or retry a partial project as new.
 
 ## Later
 

@@ -12,7 +12,7 @@ async function setup(page, options = {}) {
     } }, core: { invoke: async (command, args) => {
       window.calls.push({ command, args });
       if (command === 'probe_environment') return {
-        platform: 'windows', ready: true, hubInstalled: true, unityCliInstalled: false,
+        platform: window.options.platform || 'windows', ready: true, hubInstalled: true, unityCliInstalled: false,
         hubVersion: window.options.legacyHub ? '3.14.4' : '3.21.1', hubAutoRegistration: !window.options.legacyHub,
         suggestedProjectParent: 'F:\\UnityTest', blockers: [],
         recipe: { editorVersion: '6000.3.21f1', creatorSdkVersion: '4.0.14', urpVersion: '17.3.0', inputSystemVersion: '1.20.0' },
@@ -21,9 +21,14 @@ async function setup(page, options = {}) {
       if (command === 'create_project') {
         if (window.options.pending) await new Promise(resolve => window.finishCreate = resolve);
         if (window.options.failCreate) throw 'Project already exists. No files were changed.';
-        return { success: true, projectPath: `${args.request.parentDirectory}\\${args.request.projectName}`, message: 'Project validated.', hub: window.options.legacyHub ? { registered: false, requiresHubUpdate: true, message: 'Unity Hub 3.14.4 uses the old registry. Update to 3.21.1 or use Add > Add project from disk.' } : { registered: !window.options.failHub, message: window.options.failHub ? 'Download failed. Your project is ready to open.' : "Registered in Unity Hub's project database. Check Hub's Projects list." } };
+        return { success: true, projectPath: `${args.request.parentDirectory}\\${args.request.projectName}`, message: 'Project validated.', hub: window.options.legacyHub ? { registered: false, requiresHubUpdate: true, message: 'Unity Hub 3.14.4 uses the old registry. Update to 3.21.1 or use Add > Add project from disk.' } : { registered: !window.options.failHub, refreshPending: !window.options.failHub, message: window.options.failHub ? 'Download failed. Your project is ready to open.' : 'Project registered. A running Unity Hub may need a full restart to show it in Projects.' } };
       }
-      if (command === 'register_project') return { registered: true, message: "Registered in Unity Hub's project database. Check Hub's Projects list." };
+      if (command === 'register_project') return { registered: true, refreshPending: true, message: 'Project registered. A running Unity Hub may need a full restart to show it in Projects.' };
+      if (command === 'restart_hub') {
+        if (window.options.pendingRestart) await new Promise(resolve => window.finishRestart = resolve);
+        if (window.options.failRestart) throw 'Unity Hub did not fully exit. Nothing was force-closed.';
+        return !window.options.cancelRestart;
+      }
       if (command === 'inspect_project') return {
         projectPath: args.path, fingerprint: 'reviewed-files-sha256', canRepair: !window.options.blocked, canValidate: !window.options.blocked,
         findings: [{ status: window.options.blocked ? 'blocked' : 'repair', title: 'Visual Scripting setup', detail: window.options.blocked ? 'Project is open. Close Unity.' : 'Node database is missing.' }, { status: 'pass', title: 'Unity version', detail: '6000.3.21f1' }],
@@ -46,7 +51,7 @@ test('Hub failure preserves completed project and retry does not recreate it', a
   await expect(page.locator('#hub-result')).toContainText('Download failed');
   await expect(page.locator('#open-project-button')).toBeEnabled();
   await page.locator('#retry-hub-button').click();
-  await expect(page.locator('#hub-result')).toContainText("Registered in Unity Hub's project database.");
+  await expect(page.locator('#hub-result')).toContainText('Project registered.');
   await expect(page.locator('#retry-hub-button')).toBeHidden();
   const calls = await page.evaluate(() => window.calls);
   expect(calls.filter(call => call.command === 'create_project')).toHaveLength(1);
@@ -67,7 +72,7 @@ test('legacy Hub does not receive a green registration claim and update retry pr
   expect(await page.evaluate(() => window.calls.filter(call => call.command === 'launch_hub').length)).toBe(1);
   await page.evaluate(() => window.options.legacyHub = false);
   await page.locator('#retry-hub-button').click();
-  await expect(page.locator('#hub-result')).toHaveClass('hub-result');
+  await expect(page.locator('#hub-result')).toHaveClass('hub-result pending');
   await expect(page.locator('#requirements')).toContainText('Hub 3.21.1');
   expect(await page.evaluate(() => window.calls.filter(call => call.command === 'create_project').length)).toBe(1);
 });
@@ -79,6 +84,73 @@ async function inspectExisting(page, options = {}) {
   await page.locator('#inspect-button').click();
   await expect(page.locator('#inspection-findings')).toContainText('Visual Scripting');
 }
+
+test('registered projects offer a confirmed Hub restart without claiming UI visibility', async ({ page }, testInfo) => {
+  await setup(page);
+  await page.locator('#create-button').click();
+  await expect(page.locator('#hub-result')).toHaveClass('hub-result pending');
+  await expect(page.locator('#restart-hub-button')).toBeVisible();
+  expect(await page.evaluate(() => window.calls.some(call => call.command === 'restart_hub'))).toBe(false);
+  await page.screenshot({ path: testInfo.outputPath('hub-restart-pending.png'), fullPage: true });
+  await page.locator('#restart-hub-button').click();
+  await expect(page.locator('#hub-result')).toHaveClass('hub-result');
+  await expect(page.locator('#hub-result')).toContainText('Unity Hub restarted. Check its Projects list.');
+  await expect(page.locator('#restart-hub-button')).toBeHidden();
+  await expect(page.locator('#open-project-button')).toBeEnabled();
+  const calls = await page.evaluate(() => window.calls);
+  expect(calls.filter(call => call.command === 'create_project')).toHaveLength(1);
+  expect(calls.filter(call => call.command === 'restart_hub')).toHaveLength(1);
+  expect(calls.filter(call => call.command === 'open_project')).toHaveLength(0);
+  await page.locator('#create-another-button').click();
+  await expect(page.locator('#restart-hub-button')).toBeHidden();
+});
+
+test('cancelling the native restart prompt preserves the pending state', async ({ page }) => {
+  await setup(page, { cancelRestart: true });
+  await page.locator('#create-button').click();
+  const before = await page.locator('#hub-result').textContent();
+  await page.locator('#restart-hub-button').click();
+  await expect(page.locator('#hub-result')).toHaveText(before);
+  await expect(page.locator('#restart-hub-button')).toBeEnabled();
+  await expect(page.locator('#open-project-button')).toBeEnabled();
+});
+
+test('restart failures retain the project and allow retry', async ({ page }) => {
+  await setup(page, { failRestart: true });
+  await page.locator('#create-button').click();
+  await page.locator('#restart-hub-button').click();
+  await expect(page.locator('#action-error')).toContainText('Nothing was force-closed');
+  await expect(page.locator('#hub-result')).toHaveClass('hub-result pending');
+  await expect(page.locator('#restart-hub-button')).toBeEnabled();
+  await expect(page.locator('#open-result-hub-button')).toBeEnabled();
+  await page.evaluate(() => window.options.failRestart = false);
+  await page.locator('#restart-hub-button').click();
+  await expect(page.locator('#action-error')).toBeHidden();
+  await expect(page.locator('#hub-result')).toContainText('Unity Hub restarted');
+  expect(await page.evaluate(() => window.calls.filter(call => call.command === 'create_project').length)).toBe(1);
+});
+
+test('a pending restart locks conflicting actions and cannot be submitted twice', async ({ page }) => {
+  await setup(page, { pendingRestart: true });
+  await page.locator('#create-button').click();
+  await page.locator('#restart-hub-button').click();
+  await expect(page.locator('#restart-hub-button')).toBeDisabled();
+  await expect(page.locator('#existing-mode')).toBeDisabled();
+  await expect(page.locator('#open-project-button')).toBeDisabled();
+  await expect(page.locator('#create-another-button')).toBeDisabled();
+  await expect(page.locator('#refresh-button')).toBeDisabled();
+  await page.locator('#restart-hub-button').dispatchEvent('click');
+  expect(await page.evaluate(() => window.calls.filter(call => call.command === 'restart_hub').length)).toBe(1);
+  await page.evaluate(() => window.finishRestart());
+  await expect(page.locator('#open-project-button')).toBeEnabled();
+});
+
+test('unsupported platforms retain manual Hub refresh instructions', async ({ page }) => {
+  await setup(page, { platform: 'macos' });
+  await page.locator('#create-button').click();
+  await expect(page.locator('#restart-hub-button')).toBeHidden();
+  await expect(page.locator('#hub-result')).toContainText('Fully quit Hub, then choose Open Unity Hub.');
+});
 
 test('existing inspection is separate from approval and invalidates on path changes', async ({ page }) => {
   await inspectExisting(page);

@@ -30,6 +30,8 @@ let createdProject = null;
 let busy = false;
 let checking = false;
 let opening = false;
+let restartingHub = false;
+let hubResult = null;
 let mode = 'new';
 let inspecting = false;
 let existingReport = null;
@@ -39,6 +41,7 @@ const inspectButton = document.querySelector('#inspect-button');
 const repairButton = document.querySelector('#repair-button');
 const validateButton = document.querySelector('#validate-button');
 const retryHub = document.querySelector('#retry-hub-button');
+const restartHub = document.querySelector('#restart-hub-button');
 const newMode = document.querySelector('#new-mode');
 const existingMode = document.querySelector('#existing-mode');
 const stages = ['Check requirements', 'Prepare project', 'Import and compile', 'Configure Visual Scripting', 'Reopen and validate', 'Add to Unity Hub', 'Project ready'];
@@ -70,12 +73,13 @@ function updateControls() {
   repairButton.disabled = busy || inspecting || !existingReport?.canRepair || !existing.approval.checked;
   validateButton.disabled = busy || inspecting || !existingReport?.canValidate || !existing.approval.checked;
   retryHub.disabled = busy || inspecting || opening;
+  restartHub.disabled = busy || inspecting || opening || checking;
   document.querySelector('#open-result-hub-button').disabled = busy || inspecting || opening;
   elements.createAnother.disabled = busy || opening || checking;
   elements.openProject.disabled = busy || opening;
   document.querySelector('#open-existing-button').disabled = busy || opening;
   const label = mode === 'existing' ? busy ? 'Working in Unity' : inspecting ? 'Inspecting project' : existingCompleted ? 'Project validated' : existingReport ? 'Review findings' : 'Select a project'
-    : busy ? createdProject ? 'Adding to Unity Hub' : 'Creating project' : createdProject ? 'Project ready' : checking ? 'Checking' : environment?.ready ? 'Ready to create' : 'Setup required';
+    : busy ? restartingHub ? 'Restarting Unity Hub' : createdProject ? 'Adding to Unity Hub' : 'Creating project' : createdProject ? 'Project ready' : checking ? 'Checking' : environment?.ready ? 'Ready to create' : 'Setup required';
   const ready = mode === 'existing' ? Boolean(existingCompleted) : Boolean(createdProject || environment?.ready);
   const blocked = mode === 'existing' && existingReport?.findings.some(finding => finding.status === 'blocked');
   elements.overall.className = `overall-status ${blocked ? 'blocked' : !busy && !checking && !inspecting && ready ? 'ready' : 'checking'}`;
@@ -212,6 +216,8 @@ elements.openProject.addEventListener('click', async () => {
 elements.createAnother.addEventListener('click', () => {
   if (opening || checking || busy) return;
   createdProject = null;
+  hubResult = null;
+  restartHub.classList.add('hidden');
   document.querySelector('#hub-result').classList.add('hidden');
   retryHub.classList.add('hidden');
   document.querySelector('#open-result-hub-button').classList.add('hidden');
@@ -225,13 +231,39 @@ elements.createAnother.addEventListener('click', () => {
 refresh();
 
 function renderHubResult(result) {
+  hubResult = result;
   const element = document.querySelector('#hub-result');
-  element.className = `hub-result${result?.registered ? '' : ' pending'}`;
+  element.className = `hub-result${result?.registered && !result?.refreshPending ? '' : ' pending'}`;
   element.textContent = result?.message || 'Hub registration has not been verified. Your project is ready to open.';
   retryHub.classList.toggle('hidden', Boolean(result?.registered));
   retryHub.textContent = result?.requiresHubUpdate ? 'Recheck Hub and add project' : 'Retry adding to Unity Hub';
+  restartHub.classList.toggle('hidden', !result?.registered || !result?.refreshPending || environment?.platform?.toLowerCase() !== 'windows');
+  if (result?.registered && result?.refreshPending && environment?.platform?.toLowerCase() !== 'windows') {
+    element.textContent += ' Fully quit Hub, then choose Open Unity Hub.';
+  }
   document.querySelector('#open-result-hub-button').classList.toggle('hidden', !environment?.hubInstalled);
 }
+
+restartHub.addEventListener('click', async () => {
+  if (!createdProject || busy || inspecting || opening || checking || !hubResult?.registered || !hubResult?.refreshPending) return;
+  const previous = hubResult;
+  busy = true;
+  restartingHub = true;
+  elements.actionError.classList.add('hidden');
+  document.querySelector('#hub-result').textContent = 'Waiting for restart confirmation...';
+  updateControls();
+  try {
+    const restarted = await invoke('restart_hub');
+    renderHubResult(restarted ? { ...previous, refreshPending: false, message: "Unity Hub restarted. Check its Projects list. Your Unity project is ready to open." } : previous);
+  } catch (error) {
+    renderHubResult(previous);
+    showActionError(error);
+  } finally {
+    busy = false;
+    restartingHub = false;
+    updateControls();
+  }
+});
 
 document.querySelector('#open-result-hub-button').addEventListener('click', async () => {
   if (!createdProject || busy || opening) return;

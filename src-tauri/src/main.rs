@@ -1,12 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod hub;
+mod hub_restart;
 mod logic;
 mod repair;
 
 use logic::{CreateRequest, CreationResult, EnvironmentReport, Recipe};
 use tauri::Emitter;
-use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 #[tauri::command]
 fn get_recipe() -> Recipe {
@@ -49,6 +50,21 @@ fn open_project(path: String) -> Result<(), String> {
 #[tauri::command]
 fn launch_hub() -> Result<(), String> {
     logic::launch_hub()
+}
+
+#[tauri::command]
+async fn restart_hub(app: tauri::AppHandle) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let approved = app.dialog()
+            .message("Fully close and reopen Unity Hub to reload its Projects list?\n\nWait for Hub downloads and installations to finish first. Unity Editors and project files will not be closed or changed. If Hub refuses to close, the restart stops without force-closing it.")
+            .title("Restart Unity Hub?")
+            .kind(MessageDialogKind::Warning)
+            .buttons(MessageDialogButtons::OkCancelCustom("Restart Hub".into(), "Cancel".into()))
+            .blocking_show();
+        if !approved { return Ok(false); }
+        hub::restart_hub()?;
+        Ok(true)
+    }).await.map_err(|e| format!("Hub restart worker failed: {e}"))?
 }
 
 #[tauri::command]
@@ -121,6 +137,7 @@ fn main() {
             create_project,
             open_project,
             launch_hub,
+            restart_hub,
             register_project,
             inspect_project,
             run_existing_project,

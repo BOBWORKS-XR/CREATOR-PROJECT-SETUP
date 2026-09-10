@@ -21,6 +21,8 @@ pub struct HubRegistration {
     pub message: String,
     #[serde(default)]
     pub requires_hub_update: bool,
+    #[serde(default)]
+    pub refresh_pending: bool,
 }
 
 pub fn detected_hub_version() -> Option<String> {
@@ -49,6 +51,7 @@ fn compatibility_warning(version: Option<&str>) -> HubRegistration {
     HubRegistration {
         registered: false,
         requires_hub_update: true,
+        refresh_pending: false,
         message: format!("{installed} cannot be verified as compatible with automatic registration. Update and open Unity Hub {MINIMUM_HUB_VERSION} or newer, then recheck. Or use Hub's Add > Add project from disk and select the project folder above. Your Unity project is ready to open."),
     }
 }
@@ -254,6 +257,16 @@ pub fn register_project(project: &Path, progress: impl Fn(&str)) -> HubRegistrat
     register_for_hub_version(project, progress, version.as_deref())
 }
 
+pub fn restart_hub() -> Result<(), String> {
+    let _lock = HUB_OPERATION
+        .try_lock()
+        .map_err(|_| "Another Hub operation is running. Please wait before restarting Hub.")?;
+    let path = crate::logic::probe_environment()
+        .hub_path
+        .ok_or("Unity Hub is not installed.")?;
+    crate::hub_restart::restart(Path::new(&path))
+}
+
 fn register_for_hub_version(
     project: &Path,
     progress: impl Fn(&str),
@@ -272,12 +285,14 @@ fn register_for_hub_version(
         Ok(()) => HubRegistration {
             registered: true,
             requires_hub_update: false,
-            message: "Registered in Unity Hub's project database. Check Hub's Projects list."
+            refresh_pending: true,
+            message: "Project registered. A running Unity Hub may need a full restart to show it in Projects. Your Unity project is ready to open."
                 .into(),
         },
         Err(message) => HubRegistration {
             registered: false,
             requires_hub_update: false,
+            refresh_pending: false,
             message,
         },
     }

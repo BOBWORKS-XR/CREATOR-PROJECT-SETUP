@@ -38,6 +38,8 @@ both the declared and observed values instead of hiding that discrepancy.
   are not download percentages or an estimate of time remaining.
 - With a compatible Hub, add completed projects automatically and read back the
   registry to verify the exact project path. Opening the Editor is separate.
+- Offer a confirmed Windows Hub restart to reload a running Hub's cached list,
+  without closing Unity Editors or force-terminating Hub.
 - Open Unity Hub for missing installations and open a completed project.
 - Keep a completed project ready to open; creating another project is a separate
   action, so a second click cannot restart creation in the same folder.
@@ -56,7 +58,7 @@ or Android APK, uploaded a space, or tested interaction in a headset.
 Setup logs and receipts are kept in `.creator-project-setup` inside the created
 project. The temporary Editor validator is removed after successful creation.
 
-## 0.2.1 Preview
+## 0.2.2 Preview
 
 ### Automatic Unity Hub Registration
 
@@ -79,12 +81,29 @@ edit Hub's internal database, link a Unity Cloud project, or change analytics
 consent. The helper is a Unity beta component, not source code bundled under this
 repository's MIT license.
 
+**Hub is open, but the new project is missing?** Hub 3.21.1 loads its registered
+projects into memory at startup. CLI registration does not refresh that running
+list. The completion screen keeps refresh pending and offers **Restart Unity
+Hub** on Windows. Confirm only after Hub downloads and installations finish.
+The action fully exits and reopens the detected Hub; closing its window alone
+can leave it running in the system tray. Unity Editors remain open. A refused
+shutdown is reported without force-closing anything, and the project remains
+ready to open. Cancelling makes no changes.
+
+Restart uses Windows Restart Manager with only the verified Hub executable's
+main process ID and creation time. No project files, services, or Editor process
+trees are registered for shutdown. No Hub code or database is patched. macOS
+and Linux currently show manual full-quit/reopen instructions instead.
+
 **Correction to 0.2.0:** a CLI readback was incorrectly presented as proof of
 registration with any desktop Hub. Hub 3.14.4 reads `projects-v1.json`, whereas
 the pinned CLI writes `hub.db`. Restarting that older Hub does not bridge the two
 stores. Version 0.2.1 checks compatibility first and no longer claims the project
-is visible in the Hub UI. Hub 3.21.1's shared SQLite storage was checked in its
-distributed application code; native post-upgrade UI acceptance is still needed.
+is visible in the Hub UI. The additional live-list issue was reproduced on Hub
+3.21.1 and addressed in 0.2.2 with an explicit restart action. A native Windows
+test confirmed the missing project appeared after restart while the existing
+Unity Editor processes remained running. Database readback and process restart
+still are not automatic visual verification of every user's Projects list.
 
 ### Existing Projects
 
@@ -147,6 +166,8 @@ Windows, macOS, and Linux by GitHub Actions.
 See [docs/PLAN.md](docs/PLAN.md). Existing-project repair is a separate preview
 workflow; optional Creator Works MCP installation follows later and is not
 required for SDK correctness.
+The coordinated [optional MCP companion proposal](docs/MCP-INTEGRATION.md) keeps
+first-launch assistance and later manual access separate from MCP connection.
 
 ## License
 
