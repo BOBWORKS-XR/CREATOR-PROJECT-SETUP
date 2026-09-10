@@ -118,3 +118,24 @@ not recorded as a passed UI test.
 The app reports registry and restart outcomes separately. It does not claim to
 read back every user's visible Hub list, silently restart Hub, or overwrite its
 internal registry. Restart failure/cancellation preserves the completed project.
+
+## Next-Version Hub Identity Foundation (Unreleased)
+
+Branch `hub-compatibility`, version `0.3.0-alpha.1`, adds only the read-only
+`--creator-hub-info` entry point before Tauri startup. It does not add a Hub,
+installer, updater, single-instance behavior, or project handoff.
+
+- Windows release-subsystem EXE returned one 198-byte UTF-8 JSON line, exit 0,
+  and empty stderr; version/platform/architecture matched its build.
+- Process tests used isolated configuration/cache directories and confirmed
+  they remained empty. Extra, repeated and unknown Hub arguments returned exit
+  2, empty stdout, and no generated files within the five-second test bound.
+- 27 unit tests and two executable integration tests passed; four opt-in live
+  Unity/Hub tests remained excluded. All 21 frontend tests and Clippy passed.
+- There are no new dependencies. Metadata advertises `launch.standalone` only.
+  Single-instance startup races, blocked GUI forwarding, operation quiescence,
+  native macOS/Linux execution, signed release descriptors and automatic update
+  safety remain separate release gates in the Creator Hub plan.
+
+The public 0.2.2 artifact hashes and Unity setup behavior were not changed by
+this branch. This is compatibility foundation work, not a released Hub feature.

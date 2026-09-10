@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod creator_hub;
 mod hub;
 mod hub_restart;
 mod logic;
@@ -128,6 +129,21 @@ fn open_official_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
 }
 
 fn main() {
+    // Metadata queries must never initialize the GUI or touch project settings.
+    match creator_hub::startup_mode(std::env::args_os().skip(1)) {
+        creator_hub::StartupMode::Info => {
+            if let Err(error) = creator_hub::write_info(std::io::stdout().lock()) {
+                eprintln!("Creator Hub metadata failed: {error}");
+                std::process::exit(1);
+            }
+            return;
+        }
+        creator_hub::StartupMode::Invalid => {
+            eprintln!("Use --creator-hub-info alone; no other Hub arguments are supported.");
+            std::process::exit(2);
+        }
+        creator_hub::StartupMode::Standalone => {}
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
