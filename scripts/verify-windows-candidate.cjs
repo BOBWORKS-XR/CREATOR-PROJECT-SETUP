@@ -101,7 +101,9 @@ async function main() {
   const guard = JSON.parse(fs.readFileSync(guardPath, 'utf8').replace(/^\uFEFF/, ''));
   validateGuard(guard, await hash(path.join(repo, 'src-tauri/windows/installer-hooks.nsh')));
   const sourceRevision = git(['rev-parse', 'HEAD']);
-  const sourceDirty = git(['status', '--porcelain', '--untracked-files=normal']) !== '';
+  const sourceStatus = git(['status', '--porcelain', '--untracked-files=normal']);
+  const sourceDirty = sourceStatus !== '';
+  const sourceDiffStat = git(['diff', 'HEAD', '--stat']);
   fs.mkdirSync(output, { recursive: true });
   const installerName = `Creator-Project-Setup-${version}-Windows-setup.exe`;
   const portableName = `Creator-Project-Setup-${version}-Windows.exe`;
@@ -132,7 +134,7 @@ async function main() {
   writeJson('creator-hub-windows-x86_64.UNSIGNED.json', descriptor(version, files[0], files[2]));
   writeJson('guard-report.json', guard);
   writeJson('candidate-report.json', {
-    schemaVersion: 1, version, sourceRevision, sourceDirty, recordedAt: new Date().toISOString(),
+    schemaVersion: 1, version, sourceRevision, sourceDirty, sourceStatus, sourceDiffStat, recordedAt: new Date().toISOString(),
     artifactChecksPassed: true, signed: false, files, metadata,
     checks: { extractedInstalledExe: true, exactIdentity: true, unsupportedArgumentsRejected: true, noInstallGuardFixture: true },
     notTested: ['Actual installation', 'Installed 0.2.2 upgrade', 'Installed busy upgrade/uninstall',

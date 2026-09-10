@@ -1,0 +1,61 @@
+name: Windows Installed Acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [hub-compatibility]
+    paths:
+      - .github/workflows/windows-installed-acceptance.yml
+      - scripts/Test-InstalledCandidate.ps1
+      - scripts/installed-acceptance-pin.json
+      - scripts/owned-setup-fixture*
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  installed:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Check owned fixture and local-execution refusal
+        run: node --test scripts/owned-setup-fixture.test.cjs
+      - name: Fetch the pinned successful candidate, without rebuilding
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $pin = Get-Content scripts/installed-acceptance-pin.json -Raw | ConvertFrom-Json
+          $raw = gh api "repos/$($pin.repository)/actions/runs/$($pin.runId)"
+          if ($LASTEXITCODE -ne 0) { throw 'Could not verify candidate workflow run.' }
+          $run = $raw | ConvertFrom-Json
+          if ($run.status -ne 'completed' -or $run.conclusion -ne 'success' -or
+              $run.head_sha -cne $pin.sourceRevision -or $run.head_branch -ne 'hub-compatibility' -or
+              $run.path -ne '.github/workflows/windows-candidate.yml' -or
+              $run.repository.full_name -cne $pin.repository -or $run.event -ne 'push') {
+            throw 'Candidate run does not match the approved successful branch build.'
+          }
+          gh run download $pin.runId --repo $pin.repository --name "creator-project-setup-windows-candidate-$($pin.sourceRevision)" --dir dist/installed-source
+          if ($LASTEXITCODE -ne 0) { throw 'Could not download the pinned candidate artifact.' }
+      - name: Install public baseline and test the exact candidate update
+        shell: pwsh
+        run: ./scripts/Test-InstalledCandidate.ps1 -CandidateDirectory dist/installed-source/dist/windows-candidate/candidate
+      - name: Upload installed acceptance evidence (not a release)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: creator-project-setup-installed-acceptance-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            dist/installed-acceptance/installed-acceptance.json
+            dist/installed-acceptance/before-refusal.json
+            dist/installed-acceptance/after-refusal.json
+            dist/installed-acceptance/after-upgrade.json

@@ -12,7 +12,8 @@ assets, load signing keys, or execute the product installer/uninstaller.
 Branch pushes to `hub-compatibility` can test it before merging. Manual dispatch
 requires the workflow to exist on the default branch, per
 [GitHub's workflow documentation](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
-Do not push this preparation branch until publication coordination approves it.
+Only push this preparation branch within the coordinated test scope. A branch
+push is not approval to merge, sign, tag, or publish a release.
 
 Run locally from PowerShell 7 after installing the repository dependencies:
 
@@ -71,6 +72,31 @@ had not been pushed or run on GitHub. CI results are recorded separately in
 GitHub Actions; a candidate build does not satisfy the installation gates below.
 
 ## Installed Upgrade Gate
+
+`Windows Installed Acceptance` runs real installers **only on a disposable
+GitHub-hosted Windows runner**. The script refuses local/self-hosted execution.
+It reuses the successful candidate run and exact installer/payload hashes in
+`scripts/installed-acceptance-pin.json`; it does not rebuild or alter that artifact.
+Changing the pin is an explicit review step, not automatic selection of latest.
+
+The fixture downloads the hash-pinned public 0.2.2 NSIS installer, installs it in
+the default per-user directory, snapshots files/data/registry values, and tests
+the candidate with `/S /NS /UPDATE /D=<default path>`. A same-name, explicitly
+owned keepalive process must cause exit 10 without changing the snapshots.
+After a cooperative stop-file exit, the same update must succeed. Installed
+version, metadata, extracted payload hash, sentinels, a real main window and
+normal close are checked. No kill, Unity launch, project creation or repair occurs.
+
+Preservation evidence is limited to synthetic sentinels in app-data/cache and
+installation directories. It does **not** prove migration of real user preferences,
+project receipts, interactive dialogs, busy creation, or historical uninstallers.
+The report and before/after snapshots are diagnostic artifacts, not release assets.
+
+Candidate run [34521606644](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34521606644)
+passed artifact/native/browser/Clippy/build checks. Its report marks
+`sourceDirty: true` without identifying the changed files, so clean provenance is
+not established. The next candidate build captures status and generated-schema
+diffs; do not silently reinterpret this existing artifact as clean.
 
 The no-install NSIS fixture confirms early refusal before the legacy selection
 page when a same-name process is running. It is **not** proof of an installed

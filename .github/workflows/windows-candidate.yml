@@ -59,6 +59,13 @@ jobs:
       - name: Build and verify unsigned candidate, without installing
         shell: pwsh
         run: ./scripts/Build-WindowsCandidate.ps1 -TargetDirectory $env:CARGO_TARGET_DIR -OutputDirectory dist/windows-candidate
+      - name: Capture source changes after candidate generation
+        if: always()
+        shell: pwsh
+        run: |
+          git status --porcelain=v1 --untracked-files=normal | Tee-Object source-status.log
+          git diff HEAD --stat | Tee-Object source-diff-stat.log
+          git diff HEAD -- src-tauri/gen/schemas | Out-File generated-schema-diff.log
       - name: Upload candidate and evidence (not a release)
         if: always()
         uses: actions/upload-artifact@v4
@@ -75,3 +82,6 @@ jobs:
             ui-tests.log
             artifact-tests.log
             clippy.log
+            source-status.log
+            source-diff-stat.log
+            generated-schema-diff.log
