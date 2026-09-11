@@ -471,13 +471,16 @@ fn run_cli(
         let out = stdout_reader
             .join()
             .map_err(|_| "Unity output reader stopped.")??;
-        let _err = stderr_reader
+        let err = stderr_reader
             .join()
             .map_err(|_| "Unity error reader stopped.")??;
+        for event in receiver.try_iter() {
+            emit(event);
+        }
         if timed_out {
             return Err("Unity's read-only requirement check timed out. Check your connection and try again.".into());
         }
-        if !status.success() || out.failed_result {
+        if !status.success() || out.failed_result || err.failed_result {
             let guidance = match status.code() {
                 Some(3) => "Sign in to Unity and check licence activation, then try again.",
                 Some(4) => "Unity needs a preference or approval. Check Unity Hub and the local logs.",
@@ -787,11 +790,85 @@ mod tests {
 
     #[test]
     #[cfg(windows)]
+    fn real_child_pipes_preserve_reports_progress_and_failure_results() {
+        let temp = tempfile::tempdir().unwrap();
+        let helper = PathBuf::from(std::env::var_os("SystemRoot").unwrap())
+            .join("System32/WindowsPowerShell/v1.0/powershell.exe");
+        let fixture =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/prerequisite-cli.ps1");
+        let call = |mode: &str, query: bool, emit: &dyn Fn(Progress)| {
+            run_cli(
+                &helper,
+                &[
+                    "-NoProfile".into(),
+                    "-NonInteractive".into(),
+                    "-File".into(),
+                    fixture.to_string_lossy().into(),
+                    mode.into(),
+                ],
+                "fixture",
+                temp.path(),
+                query,
+                &|p| emit(p),
+            )
+        };
+        assert_eq!(
+            call("query", true, &|_| {}).unwrap()["totalDownloadSize"],
+            1234
+        );
+        assert!(call("bad-json", true, &|_| {}).is_err());
+        assert!(
+            call("false-result", false, &|_| {}).is_err(),
+            "A zero exit code cannot override a failed result"
+        );
+        assert!(call("offline", false, &|_| {})
+            .unwrap_err()
+            .contains("connection"));
+        let events = Mutex::new(Vec::new());
+        call("progress", false, &|event| {
+            events.lock().unwrap().push(event)
+        })
+        .unwrap();
+        let events = events.lock().unwrap();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].percent, Some(42.0));
+        assert_eq!(events[1].percent, None);
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn active_editor_guard_blocks_only_the_selected_executable() {
+        use std::os::windows::process::CommandExt;
+        let temp = tempfile::tempdir().unwrap();
+        let helper =
+            PathBuf::from(std::env::var_os("SystemRoot").unwrap()).join("System32/ping.exe");
+        let executable = temp.path().join("Unity.exe");
+        fs::copy(helper, &executable).unwrap();
+        let mut child = Command::new(&executable)
+            .args(["-t", "127.0.0.1"])
+            .creation_flags(0x08000000)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        // Capture outcomes before assertions so this exact owned fixture is always reaped.
+        let selected = require_editor_closed(&executable);
+        let unrelated = require_editor_closed(&temp.path().join("another/Unity.exe"));
+        let _ = child.kill();
+        child.wait().unwrap();
+        assert!(selected.unwrap_err().contains("running"));
+        assert!(unrelated.is_ok());
+    }
+
+    #[test]
+    #[cfg(windows)]
     #[ignore = "installs Unity on an explicitly approved disposable Windows Actions runner only"]
     fn disposable_install_smoke() {
         for (key, value) in [
             ("GITHUB_ACTIONS", "true"),
             ("CI", "true"),
+            ("RUNNER_ENVIRONMENT", "github-hosted"),
+            ("RUNNER_OS", "Windows"),
             ("CREATOR_SETUP_ACCEPT_TEST_LICENSES", "true"),
         ] {
             assert_eq!(
@@ -815,6 +892,11 @@ mod tests {
             parent_directory: parent.to_string_lossy().into(),
         };
         assert!(!parent.join(&request.project_name).exists());
+        let cancelled = ensure(&request, |_| false, |_| {}).unwrap_err();
+        assert!(cancelled.contains("cancelled before installation"));
+        assert!(!logic::probe_environment().hub_installed);
+        assert!(logic::probe_environment().editors.is_empty());
+        assert!(!parent.join(&request.project_name).exists());
         ensure(
             &request,
             |plan| {
@@ -828,11 +910,51 @@ mod tests {
         )
         .unwrap();
         assert!(logic::probe_environment().ready);
+        ensure(
+            &request,
+            |_| panic!("A verified installation must be reused"),
+            |_| {},
+        )
+        .unwrap();
+
+        // Damage only a named file in the installation created above, on this
+        // disposable runner, to prove repair defeats stale Installed metadata.
+        let installed = logic::probe_environment()
+            .editors
+            .into_iter()
+            .find(|e| e.exact_recipe)
+            .unwrap();
+        let root = fs::canonicalize(&installed.root).unwrap();
+        let java = root.join("Editor/Data/PlaybackEngines/AndroidPlayer/OpenJDK/bin/java.exe");
+        assert!(fs::canonicalize(&java).unwrap().starts_with(&root));
+        fs::remove_file(&java).unwrap();
+        assert!(!logic::probe_environment().ready);
+        ensure(
+            &request,
+            |plan| {
+                assert_eq!(plan.action, Action::AddModules);
+                assert_eq!(plan.modules, vec![OPENJDK_MODULE]);
+                assert!(!plan.install_hub);
+                println!(
+                    "Approved isolated OpenJDK repair: {}",
+                    serde_json::to_string(plan).unwrap()
+                );
+                true
+            },
+            |event| println!("{}", serde_json::to_string(&event).unwrap()),
+        )
+        .unwrap();
+        assert!(java.is_file());
+        assert!(logic::probe_environment().ready);
+        assert!(
+            !licence_ready(|_| {}).unwrap(),
+            "This disposable test must not acquire a Unity account licence"
+        );
         assert!(
             !parent.join(&request.project_name).exists(),
             "Prerequisite testing must not pretend it created a Unity project"
         );
-        let report = json!({"setupVersion":env!("CARGO_PKG_VERSION"), "editorVersion":EDITOR_VERSION,"prerequisitesVerified":true,"projectCreated":false,"unityAccountUsed":false,"licenseActivationTested":false});
+        let report = json!({"setupVersion":env!("CARGO_PKG_VERSION"), "editorVersion":EDITOR_VERSION,"prerequisitesVerified":true,"cancellationVerified":true,"existingInstallReused":true,"missingJdkRepaired":true,"inactiveLicenceDetected":true,"projectCreated":false,"unityAccountUsed":false,"licenseActivationTested":false});
         fs::write(
             parent.join("creator-prerequisite-acceptance.json"),
             serde_json::to_vec_pretty(&report).unwrap(),

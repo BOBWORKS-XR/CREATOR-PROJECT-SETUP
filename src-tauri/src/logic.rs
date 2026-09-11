@@ -1282,13 +1282,27 @@ mod tests {
             .expect("set CREATOR_SETUP_SMOKE_PARENT to an existing disposable test directory");
         let name =
             env::var("CREATOR_SETUP_SMOKE_NAME").unwrap_or_else(|_| "CreatorSetupSmoke".into());
-        let result = create_project(
-            CreateRequest {
-                project_name: name,
-                parent_directory: parent,
-            },
-            |progress| println!("progress: {} {}", progress.step, progress.detail),
+        let request = CreateRequest {
+            project_name: name,
+            parent_directory: parent,
+        };
+        assert!(
+            probe_environment().ready,
+            "This smoke never installs prerequisites on the developer's PC"
+        );
+        crate::bootstrap::ensure(
+            &request,
+            |_| panic!("No installation is allowed in this smoke"),
+            |event| println!("{}", event.stage),
         )
+        .unwrap();
+        assert!(
+            crate::bootstrap::licence_ready(|event| println!("{}", event.stage)).unwrap(),
+            "Activate Unity normally before running the local creation test"
+        );
+        let result = create_project(request, |progress| {
+            println!("progress: {} {}", progress.step, progress.detail)
+        })
         .expect("real Unity setup should succeed");
         assert!(result.success);
         assert!(result.hub.registered, "{}", result.hub.message);

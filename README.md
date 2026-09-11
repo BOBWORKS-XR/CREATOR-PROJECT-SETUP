@@ -98,13 +98,17 @@ both the declared and observed values instead of hiding that discrepancy.
 
 ## First Release Scope
 
-**Missing prerequisites are currently detected, not installed.** This includes
+**Published 0.3.0-alpha.2 detects missing prerequisites; it does not install them.** This includes
 the pinned Unity Editor, Android tools and Windows build support. If the Editor
 is absent, several requirements show as missing together; the current action
 only opens Unity Hub. Setup installs the Creator SDK into a new project after
 the Unity requirements are present. Guided prerequisite installation is the
-[next priority](docs/PLAN.md#next-priority---prerequisite-installation-not-implemented),
+[next priority](docs/PLAN.md#next-priority---prerequisite-installation-candidate),
 not a feature of the published diagnostics hotfix.
+
+The isolated [alpha.3 candidate](docs/PREREQUISITE-CANDIDATE.md) adds an approved
+Windows installation flow behind **Set up and create project**. Real
+clean-machine acceptance is in progress; this is not yet a released feature.
 
 - Detect Unity Hub, Unity CLI, compatible Editors, and required build modules.
 - Create a new project from the matching Editor's official 3D URP template.

@@ -46,7 +46,11 @@ macOS/Linux acceptance. Backups are selective; failure recovery is manual.
 - Keep project handoff, bridge installation, native GUI embedding, and the
   Coming Soon URP Converter outside the first compatibility change.
 
-## Next Priority - Prerequisite Installation (Not Implemented)
+## Next Priority - Prerequisite Installation Candidate
+
+An isolated Windows-first alpha.3 implementation is under validation. See the
+[candidate flow and release gates](PREREQUISITE-CANDIDATE.md). The historical gap
+below still describes published alpha.2; do not treat the candidate as released.
 
 A fresh-PC report on 2026-09-11 shows Unity Hub 3.13.0 present but the pinned
 Editor, modules and template absent. Source inspection confirms that the app

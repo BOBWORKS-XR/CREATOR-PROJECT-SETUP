@@ -20,6 +20,13 @@ Existing-project repair/validation reports and logs remain inside the operation'
 
 ## Review Before Sharing
 
+For the unreleased alpha.3 prerequisite-installation candidate, failures before
+project creation also write local reports under
+`%LOCALAPPDATA%\CreatorProjectSetup\logs\requirements-<id>\`. Keep
+`requirements-receipt.json` and the relevant installer log. The error displays
+the report path. Raw CLI environment and licence-query responses are not saved.
+This does not make the remaining installer logs safe to publish unreviewed.
+
 Review both receipts and raw logs. They can contain local paths, project names,
 machine/session identifiers, licensing details or package URLs. Redact personal
 paths and identifiers, credentials, tokens and private registry URLs. Start with
