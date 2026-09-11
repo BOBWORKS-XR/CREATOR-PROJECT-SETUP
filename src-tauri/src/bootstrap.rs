@@ -780,20 +780,8 @@ fn ensure_inner(
                 "Installing Unity Hub",
                 "Downloading the official signed installer. Windows may ask for approval.",
             ));
-            run_cli(
-                &helper,
-                &strings(&[
-                    "hub",
-                    "install",
-                    "--hub-version",
-                    crate::hub::MINIMUM_HUB_VERSION,
-                    "--headless",
-                ]),
-                "install-hub",
-                &logs,
-                false,
-                &emit,
-            )?;
+            #[cfg(windows)]
+            crate::hub_installer::install(&logs, &emit)?;
             if !logic::probe_environment().hub_installed {
                 return Err("Unity Hub did not appear after installation. Check the Windows installer and local logs before retrying.".into());
             }

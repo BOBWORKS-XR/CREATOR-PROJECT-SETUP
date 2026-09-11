@@ -4,6 +4,8 @@ mod bootstrap;
 mod creator_hub;
 mod hosted;
 mod hub;
+#[cfg(windows)]
+mod hub_installer;
 mod hub_restart;
 mod lifecycle;
 mod logic;

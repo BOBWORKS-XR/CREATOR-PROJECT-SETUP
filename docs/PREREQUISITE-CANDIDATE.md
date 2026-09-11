@@ -10,8 +10,10 @@ Published `0.3.0-alpha.2` does not install missing Unity requirements.
 3. Review the native installation confirmation: exact Editor version, locations,
    estimated download and conservative free-space reserve. Explicitly accept
    the linked Unity, Android SDK/NDK and OpenJDK terms to proceed.
-4. Setup uses its pinned, checksum-verified official Unity CLI helper to install
-   missing Hub/Editor requirements. Windows may request administrator approval.
+4. Setup downloads the pinned official Hub installer and checks its exact SHA-256,
+   valid Windows Authenticode signature, signing certificate and product version
+   before launch. The verified official Unity CLI installs Editor/modules.
+   Windows may request administrator approval.
 5. Setup checks actual Editor/tool files and the installed URP template. An
    installer exit code alone is not considered sufficient.
 6. If Unity reports no active licence, open Unity Hub from the prompt, complete
@@ -55,7 +57,7 @@ approvals. macOS/Linux automatic installation is not implemented.
 
 ## Validation Gates
 
-The local candidate passes 52 Rust unit tests, 2 executable metadata
+The local candidate passes 56 Rust unit tests, 2 executable metadata
 integration tests, 43 UI tests and strict Clippy. These are not clean-machine
 installation proof.
 
@@ -71,14 +73,20 @@ installed payload identity, portable metadata and an active-app installer guard.
 These are not installed-upgrade acceptance of alpha.3.
 
 The owner approved a disposable Windows CI installation of Unity and required
-Android tools without using their Unity account. The first real installation
-run [34593430878](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34593430878)
-stopped before installation because the stock GitHub image already included
-Unity Hub. The fixture was corrected to uninstall only that image's signed Hub
-using its own uninstaller, never deleting Editor folders. The replacement run is
-[34594398051](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34594398051).
-It also tests cancel-before-install, reuse, isolated OpenJDK repair, and detection
-of missing activation. Results must be recorded before release.
+Android tools without using their Unity account. Early runs stopped before
+installation: the image included Hub, preview output was not pure JSON, and
+the system volume had insufficient free space. The image's signed Hub is now
+removed with its own uninstaller; only ordinary files in unused CodeQL/Python
+tool caches are cleared. Linked entries and all existing Editor folders are
+left untouched. Application storage checks were not relaxed for CI.
+
+Run [34595273184](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34595273184)
+captured the exact CLI preview format for a committed regression fixture.
+The current installation run is
+[34597376140](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34597376140).
+It tests cancel-before-install, reuse, isolated OpenJDK repair, execution of
+Java/javac/ADB/NDK clang, and detection of missing activation. Its final outcome
+must be recorded before release. A failed preflight is not installation proof.
 
 Separate gates remain for real module repair, declined elevation, interrupted
 downloads and retry, fresh-machine sign-in/activation, and Creator project
@@ -97,5 +105,12 @@ pinned to this executable. Do not update that pin before candidate acceptance.
 
 The pinned CLI is experimental. Its actual `--help` and read-only previews were
 checked: JSON dry-run is required; the NDJSON dry-run produced no final report.
+Even `--quiet --json` previews prepend dependency notices on stdout. The adapter
+permits only the exact known notice syntax before one complete JSON document;
+unknown warnings/errors and trailing data remain rejected.
+The genuine Hub 3.21.1 Windows download was independently verified locally.
+Beta.9's `hub install` rejected it during CI with a signature error naming a
+macOS Developer ID; Setup therefore uses its own Windows trust verification
+and official installer launch. No signature-check bypass flag is used.
 OpenJDK uses a release-specific module ID, and repair dry-runs must include
 `--reinstall` to describe the same repair set as the approved install.

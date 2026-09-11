@@ -118,7 +118,7 @@ jobs:
           }
           }
           Write-Output "System volume free bytes before: $before; after: $((Get-PSDrive -Name $drive).Free)"
-      - name: Install actual Unity requirements on this disposable machine
+      - name: Install signature-verified Hub and actual Unity requirements
         shell: pwsh
         env:
           CREATOR_SETUP_ACCEPT_TEST_LICENSES: 'true'
