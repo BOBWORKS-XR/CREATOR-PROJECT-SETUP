@@ -46,6 +46,58 @@ macOS/Linux acceptance. Backups are selective; failure recovery is manual.
 - Keep project handoff, bridge installation, native GUI embedding, and the
   Coming Soon URP Converter outside the first compatibility change.
 
+## Next Priority - Prerequisite Installation (Not Implemented)
+
+A fresh-PC report on 2026-09-11 shows Unity Hub 3.13.0 present but the pinned
+Editor, modules and template absent. Source inspection confirms that the app
+only probes those requirements and opens Hub; it never runs an Editor/module
+installation. This is a gap against the intended beginner setup workflow, not
+evidence that the user used it incorrectly. The diagnostics alpha.2 hotfix does
+not add prerequisite installation.
+
+Planned Windows-first flow:
+
+- Offer one explicit **Install requirements** action. Preview the exact Editor,
+  required Android/Windows components, install location and available disk space.
+  Keep Android and Windows mandatory. Do not install unrelated optional tools.
+- Reuse Unity's official CLI, with a reviewed version and verified download.
+  Validate its actual command contract before implementation. The existing
+  registration helper is pinned, but its 45-second registration runner is not
+  suitable for long Editor installs and must not be reused unchanged.
+- Install the pinned Editor when absent; add only missing compatible modules to
+  an existing managed installation. Preserve other Editors/projects. Do not
+  uninstall or overwrite a manually installed Editor to make it manageable.
+- Handle missing/old Hub explicitly. Keep Hub's automatic-project-registration
+  version gate separate from the Editor installation prerequisites. A missing
+  Editor should not look like six unrelated faults; an optional Hub feature
+  should not look like a mandatory project-creation failure.
+- Show real download/install stages and local logs. Handle disk-full, network,
+  permission, cancellation and partially installed states with a new inspection
+  before retry. Never infer success from a launched command or exit code alone.
+- Keep Unity sign-in, licensing, third-party module agreements and OS elevation
+  explicit. Do not bypass these prompts, force-close apps, change security/proxy
+  settings, or automatically accept terms.
+- Re-probe the executable, required tools and URP template after installation,
+  then enable the existing project creation and second-session validation flow.
+  A missing template must have an evidenced supported recovery route.
+
+Acceptance must cover a clean machine, Hub-only (including older Hub), missing
+modules, a complete existing installation and a manually located Editor. Test
+failed download, disk-full/insufficient-space, denied elevation and a safe retry.
+At least one disposable real Windows test must install the pinned Editor and
+required modules, create a Creator SDK project, initialize Visual Scripting and
+pass reopen validation. Existing app installer/hosting tests do not prove this.
+macOS/Linux installation remains separate until tested natively.
+
+Primary references checked 2026-09-11:
+
+- [Unity CLI installation and module commands](https://docs.unity.com/en-us/unity-cli/use-unity-cli)
+- [Unity CLI command reference](https://docs.unity.com/en-us/unity-cli/unity-cli-reference)
+- [Unity's Hub bootstrap reference](https://github.com/Unity-Technologies/skills/blob/main/skills/unity-cli/references/config-hub.md)
+
+The CLI is experimental. Documentation establishes an official automation route,
+not proof that every supported PC or the pinned helper already works end to end.
+
 ## Next Safety Pass
 
 - Add project/cache volume free-space preflight and a clear disk-full failure.
