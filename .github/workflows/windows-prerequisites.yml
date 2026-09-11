@@ -86,14 +86,16 @@ jobs:
           $drive = ([IO.Path]::GetPathRoot($env:ProgramFiles)).TrimEnd('\', ':')
           if ($drive -notmatch '^[A-Z]$') { throw 'Unexpected system installation volume.' }
           $before = (Get-PSDrive -Name $drive).Free
-          # This workflow never uses Python. Keep Node, Rust, SDKs and all Unity data.
-          if ($before -lt 40GB -and $env:RUNNER_TOOL_CACHE) {
+          # This workflow uses neither CodeQL nor Python. Keep Node, Rust, SDKs and Unity data.
+          # CodeQL's toolcache location is defined by actions/runner-images Install-CodeQLBundle.ps1.
+          foreach ($unused in @('CodeQL', 'Python')) {
+          if ((Get-PSDrive -Name $drive).Free -lt 40GB -and $env:RUNNER_TOOL_CACHE) {
             $cache = [IO.Path]::GetFullPath($env:RUNNER_TOOL_CACHE).TrimEnd('\')
-            $python = Join-Path $cache 'Python'
-            if (Test-Path -LiteralPath $python -PathType Container) {
-              $resolved = (Resolve-Path -LiteralPath $python).Path
-              if ($resolved -ne $python -or -not $resolved.StartsWith($cache + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Unexpected fixture cache path.' }
-              if ((Get-Item -LiteralPath $python).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Refusing linked fixture cache.' }
+            $entryRoot = Join-Path $cache $unused
+            if (Test-Path -LiteralPath $entryRoot -PathType Container) {
+              $resolved = (Resolve-Path -LiteralPath $entryRoot).Path
+              if ($resolved -ne $entryRoot -or -not $resolved.StartsWith($cache + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Unexpected fixture cache path.' }
+              if ((Get-Item -LiteralPath $entryRoot).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Refusing linked fixture cache.' }
               # Walk ordinary directories only. Leave every junction/link and directory
               # in place; delete individual cache files without recursive removal.
               $pending = [Collections.Generic.Queue[string]]::new()
@@ -111,8 +113,9 @@ jobs:
                   $removed += $length
                 }
               }
-              Write-Output "Removed $removed bytes of ordinary Python cache files; left $skipped links untouched."
+              Write-Output "Removed $removed bytes of ordinary $unused cache files; left $skipped links untouched."
             }
+          }
           }
           Write-Output "System volume free bytes before: $before; after: $((Get-PSDrive -Name $drive).Free)"
       - name: Install actual Unity requirements on this disposable machine
