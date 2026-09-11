@@ -43,9 +43,9 @@ approvals. macOS/Linux automatic installation is not implemented.
 - Cancellation is available before installation. Once an installer has started,
   Setup waits for it; it does not abruptly kill an installer or offer a misleading
   immediate cancel button.
-- Download percentages are component-specific. Installation phases remain
-  indeterminate because the pinned CLI reports a placeholder installation
-  percentage rather than measured extraction progress.
+- Download percentages and component messages are forwarded from the CLI.
+  Installation phases remain indeterminate; the CLI's installation percentage
+  is not treated as measured extraction progress.
 - Preflight storage is a conservative reserve, not an exact disk estimate. It
   cannot guarantee that another program will not consume space during setup.
 - Retrying inspects the installation again. A partial/unregistered Editor that
@@ -57,7 +57,7 @@ approvals. macOS/Linux automatic installation is not implemented.
 
 ## Validation Gates
 
-The local candidate passes 56 Rust unit tests, 2 executable metadata
+The local candidate passes 57 Rust unit tests, 2 executable metadata
 integration tests, 43 UI tests and strict Clippy. These are not clean-machine
 installation proof.
 

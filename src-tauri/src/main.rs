@@ -59,7 +59,7 @@ async fn create_project(
                     |plan| approve_installation(&app, plan),
                     |progress| hosted::emit(&app, "requirements-progress", progress))?;
             }
-            let open = app.dialog().message("Unity is installed, but no active Unity licence was reported.\n\nSign in and activate your licence in Unity Hub, then return to Setup and choose Create and validate project again. Your installed requirements will be reused. No project files have been created.\n\nOpen Unity Hub now?")
+            let open = app.dialog().message("Unity is installed, but an active Unity licence could not be confirmed.\n\nComplete any first-run setup, sign in and activate your licence in Unity Hub, then return to Setup and choose Create and validate project again. Your installed requirements will be reused. No project files have been created.\n\nOpen Unity Hub now?")
                 .title("Unity activation required")
                 .buttons(MessageDialogButtons::OkCancelCustom("Open Unity Hub".into(), "Not now".into()))
                 .blocking_show();

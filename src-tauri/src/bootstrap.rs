@@ -370,7 +370,12 @@ fn frame_progress(frame: &Value) -> Option<Progress> {
     if !["download", "install"].contains(&phase) {
         return None;
     }
-    let name = compact(frame["name"].as_str().unwrap_or("Unity requirements"));
+    let name = compact(
+        frame["msg"]
+            .as_str()
+            .or_else(|| frame["name"].as_str())
+            .unwrap_or("Unity requirements"),
+    );
     let percent = if phase == "download" {
         frame["pct"]
             .as_f64()
@@ -524,6 +529,12 @@ fn run_cli(
         }
         if timed_out {
             return Err("Unity's read-only requirement check timed out. Check your connection and try again.".into());
+        }
+        // A fresh CLI can request sign-in/first-run configuration instead of
+        // returning active:false. This means NOT verified, never permission to
+        // create a project; let the native Hub handoff handle the user action.
+        if preview && label == "licence" && matches!(status.code(), Some(3 | 4)) {
+            return Ok(json!({"active":false,"requiresUserAction":true}));
         }
         if !status.success() || out.failed_result || err.failed_result {
             let guidance = match status.code() {
@@ -926,7 +937,47 @@ mod tests {
         let events = events.lock().unwrap();
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].percent, Some(42.0));
+        assert_eq!(events[0].detail, "Downloading Android Build Support...");
         assert_eq!(events[1].percent, None);
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn fresh_licence_configuration_requests_handoff_but_other_errors_still_fail() {
+        let temp = tempfile::tempdir().unwrap();
+        let helper = PathBuf::from(std::env::var_os("SystemRoot").unwrap())
+            .join("System32/WindowsPowerShell/v1.0/powershell.exe");
+        let fixture =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/prerequisite-cli.ps1");
+        for (mode, label, handoff) in [
+            ("configuration", "licence", true),
+            ("auth", "licence", true),
+            ("offline", "licence", false),
+            ("bad-json", "licence", false),
+            ("configuration", "install-editor", false),
+        ] {
+            let result = run_cli(
+                &helper,
+                &[
+                    "-NoProfile".into(),
+                    "-NonInteractive".into(),
+                    "-File".into(),
+                    fixture.to_string_lossy().into(),
+                    mode.into(),
+                ],
+                label,
+                temp.path(),
+                true,
+                &|_| {},
+            );
+            if handoff {
+                let data = result.unwrap();
+                assert!(!active_licence(&data).unwrap());
+                assert_eq!(data["requiresUserAction"], true);
+            } else {
+                assert!(result.is_err());
+            }
+        }
     }
 
     #[test]
@@ -985,6 +1036,15 @@ mod tests {
             project_name: "CreatorBootstrapSmoke".into(),
             parent_directory: parent.to_string_lossy().into(),
         };
+        let mut report = json!({"setupVersion":env!("CARGO_PKG_VERSION"), "editorVersion":EDITOR_VERSION,"prerequisitesVerified":false,"cancellationVerified":false,"existingInstallReused":false,"missingJdkRepaired":false,"activationHandoffRequired":false,"completed":false,"projectCreated":false,"unityAccountUsed":false,"licenseActivationTested":false});
+        let checkpoint = |value: &Value| {
+            fs::write(
+                parent.join("creator-prerequisite-acceptance.json"),
+                serde_json::to_vec_pretty(value).unwrap(),
+            )
+            .unwrap()
+        };
+        checkpoint(&report);
         assert!(!parent.join(&request.project_name).exists());
         let cancelled = ensure(&request, |_| false, |_| {}).unwrap_err();
         assert!(
@@ -994,6 +1054,8 @@ mod tests {
         assert!(!logic::probe_environment().hub_installed);
         assert!(logic::probe_environment().editors.is_empty());
         assert!(!parent.join(&request.project_name).exists());
+        report["cancellationVerified"] = json!(true);
+        checkpoint(&report);
         ensure(
             &request,
             |plan| {
@@ -1007,6 +1069,8 @@ mod tests {
         )
         .unwrap();
         assert!(logic::probe_environment().ready);
+        report["prerequisitesVerified"] = json!(true);
+        checkpoint(&report);
         ensure(
             &request,
             |_| panic!("A verified installation must be reused"),
@@ -1016,6 +1080,8 @@ mod tests {
 
         // Damage only a named file in the installation created above, on this
         // disposable runner, to prove repair defeats stale Installed metadata.
+        report["existingInstallReused"] = json!(true);
+        checkpoint(&report);
         let installed = logic::probe_environment()
             .editors
             .into_iter()
@@ -1043,6 +1109,8 @@ mod tests {
         .unwrap();
         assert!(java.is_file());
         assert!(logic::probe_environment().ready);
+        report["missingJdkRepaired"] = json!(true);
+        checkpoint(&report);
         let mut tool_versions = serde_json::Map::new();
         for (relative, arg) in [
             ("OpenJDK/bin/java.exe", "-version"),
@@ -1075,20 +1143,19 @@ mod tests {
             assert!(!version.trim().is_empty());
             tool_versions.insert(relative.into(), json!(compact(&version)));
         }
+        report["toolVersions"] = Value::Object(tool_versions);
+        checkpoint(&report);
         assert!(
             !licence_ready(|_| {}).unwrap(),
-            "This disposable test must not acquire a Unity account licence"
+            "This disposable test must require a user activation handoff"
         );
         assert!(
             !parent.join(&request.project_name).exists(),
             "Prerequisite testing must not pretend it created a Unity project"
         );
-        let report = json!({"setupVersion":env!("CARGO_PKG_VERSION"), "editorVersion":EDITOR_VERSION,"prerequisitesVerified":true,"cancellationVerified":true,"existingInstallReused":true,"missingJdkRepaired":true,"toolVersions":tool_versions,"inactiveLicenceDetected":true,"projectCreated":false,"unityAccountUsed":false,"licenseActivationTested":false});
-        fs::write(
-            parent.join("creator-prerequisite-acceptance.json"),
-            serde_json::to_vec_pretty(&report).unwrap(),
-        )
-        .unwrap();
+        report["activationHandoffRequired"] = json!(true);
+        report["completed"] = json!(true);
+        checkpoint(&report);
     }
     fn editor() -> EditorInstallation {
         EditorInstallation {

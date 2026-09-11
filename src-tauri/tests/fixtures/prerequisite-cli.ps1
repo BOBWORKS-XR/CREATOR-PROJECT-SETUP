@@ -10,8 +10,10 @@ switch ($mode) {
         [Console]::Out.WriteLine('{"type":"result","success":false}')
     }
     'offline' { exit 7 }
+    'configuration' { exit 4 }
+    'auth' { exit 3 }
     'progress' {
-        [Console]::Out.WriteLine('{"type":"progress","phase":"download","name":"Android","pct":42}')
+        [Console]::Out.WriteLine('{"type":"progress","phase":"download","msg":"Downloading Android Build Support...","pct":42}')
         [Console]::Out.WriteLine('{"type":"progress","phase":"install","name":"Android","pct":50}')
         [Console]::Out.WriteLine('{"type":"result","success":true}')
     }
