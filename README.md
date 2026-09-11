@@ -36,6 +36,12 @@ reviewed validation/repair workflow.
 See [0.3.0-alpha.2 release notes](docs/RELEASE-0.3.0-alpha.2.md). This is an
 error-reporting improvement, not a claim that package-download failures are fixed.
 
+Alpha.2 passed [clean candidate checks](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34587957462)
+and [installed upgrades from both stable 0.2.2 and prerelease alpha.1](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34588485597),
+using the same exact installer. Evidence includes 41 Rust tests, 34 browser tests,
+active-test-process refusal, unchanged refusal snapshots and installed payload
+verification. It does not prove the reporting user's network has recovered.
+
 ### Included From Alpha.1
 
 - Compact interface and shared Creator app navigation.

@@ -31,8 +31,20 @@ Hub compatibility update is prepared. No MCP update is required for this hotfix.
 
 ## Validation
 
-Final clean-build and installed-upgrade evidence will accompany the accepted
-release assets. Unit/browser tests alone do not establish a successful Unity
-download or project completion on the reporting user's machine. Native macOS and
-Linux workflows, full project recovery and headset behavior are not validated by
-this Windows diagnostics release.
+[Clean Windows candidate checks](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34587957462)
+passed for source `a8878c49a4c4cb57268c45484baa9e889b79bac2`: 41 Rust tests,
+34 browser tests, strict Clippy, packaged notices, exact executable identity,
+portable ZIP and installer guard checks. Four explicit live Unity/Hub tests were
+not run. The release contains these exact accepted binaries, not a rebuild.
+
+[Installed upgrade acceptance](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34588485597)
+passed on two separate disposable Windows runners: public 0.2.2 to alpha.2 and
+public alpha.1 to alpha.2. Each tested early refusal with a same-name owned test
+process alive, unchanged refusal snapshots, cooperative exit, successful update,
+installed executable/license hashes, synthetic preservation sentinels, real GUI
+startup and normal close. See `release-verification.json` for exact hashes/scope.
+
+These tests do not establish real user-settings migration, every historical
+uninstaller, a busy Unity creation/repair, reporter-side network recovery or
+successful project completion. Native macOS/Linux workflows, full project
+recovery and headset behavior are outside this Windows diagnostics acceptance.
