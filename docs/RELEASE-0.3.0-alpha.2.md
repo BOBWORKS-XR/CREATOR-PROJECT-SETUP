@@ -25,9 +25,10 @@ Use the Windows installer or the portable ZIP from this release. Keep `licenses/
 with the portable EXE. Close Setup normally before upgrading. Both forms work
 standalone; Creator Hub is optional. Windows binaries are not Authenticode signed.
 
-Hub's hosted view requires exact-build acceptance. Do not assume an older Hub can
-host this newly built version. Standalone use remains available while the matching
-Hub compatibility update is prepared. No MCP update is required for this hotfix.
+For hosted use, update to the matching
+[Creator Hub 0.1.0-alpha.5](https://github.com/BOBWORKS-XR/CREATOR-HUB/releases/tag/v0.1.0-alpha.5)
+first. Signed metadata tells older Hubs to update Hub before installing this
+Setup version. Standalone Setup remains independent. No MCP update is required.
 
 ## Validation
 

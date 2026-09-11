@@ -19,9 +19,10 @@ in local creation receipts. Stable users can continue using 0.2.2 below.
 as a Windows installer or portable ZIP. Hub is optional. Keep the included
 `licenses` folder with the portable app. Close Setup normally before upgrading.
 
-[Creator Hub](https://github.com/BOBWORKS-XR/CREATOR-HUB/releases) can manage the
-Creator apps, but hosting a new Setup build requires matching Hub acceptance
-pins. Use this hotfix standalone until a compatible Hub update is available.
+[Creator Hub 0.1.0-alpha.5](https://github.com/BOBWORKS-XR/CREATOR-HUB/releases/tag/v0.1.0-alpha.5)
+is the matching Hub version for this Setup build. Update Hub first for hosted use;
+older Hubs deliberately block the new in-app Setup update. Standalone Setup does
+not require Hub.
 Verified downloads do not install without your approval.
 Creator Works MCP does not require Project Setup: an existing Unity project can
 use MCP on its own. Install Project Setup when you need its project-creation or
