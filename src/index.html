@@ -65,6 +65,7 @@
         <div class="recipe-line" id="recipe-line">Loading approved recipe…</div>
 
         <button id="create-button" class="primary-button" type="button" disabled>Create and validate project</button>
+        <p id="requirements-consent" class="recipe-line hidden">Installation requires your approval. Licence terms: <button type="button" class="text-button" data-terms="unity">Unity</button>, <button type="button" class="text-button" data-terms="android">Android SDK/NDK</button>, <button type="button" class="text-button" data-terms="openjdk">OpenJDK</button>.</p>
         </div>
         <div id="project-summary" class="project-summary hidden">
           <span class="summary-icon"><span class="icon icon-folder" aria-hidden="true"></span></span>
@@ -74,6 +75,7 @@
           <div class="activity-header"><span class="spinner"></span><strong id="activity-title">Preparing project</strong></div>
           <p id="activity-message">Unity may take several minutes while packages resolve and compile.</p>
           <progress id="stage-progress" max="7" value="0" aria-label="Completed setup stages"></progress>
+          <progress id="download-progress" class="hidden" max="100" aria-label="Current component download"></progress>
           <ol id="progress-steps" class="progress-steps" aria-label="Setup stages"></ol>
           <span id="elapsed-time" class="elapsed-time"></span>
         </div>
@@ -127,7 +129,7 @@
   </main>
 
   <footer>
-    <span>Creator Project Setup <span class="footer-version">0.3.0-alpha.2</span></span>
+    <span>Creator Project Setup <span class="footer-version">0.3.0-alpha.3 candidate</span></span>
     <div class="footer-links"><button id="github-button" class="text-button" type="button">GitHub <span class="icon icon-external" aria-hidden="true"></span></button><button id="sdk-source-button" class="text-button" type="button">Creator SDK source <span class="icon icon-external" aria-hidden="true"></span></button></div>
   </footer>
   <script src="runtime.js"></script>

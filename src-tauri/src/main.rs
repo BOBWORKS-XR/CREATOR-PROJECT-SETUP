@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod bootstrap;
 mod creator_hub;
 mod hosted;
 mod hub;
@@ -42,6 +43,32 @@ async fn create_project(
     let operation = lifecycle::LIFECYCLE.command()?;
     tauri::async_runtime::spawn_blocking(move || {
         let _operation = operation;
+        let _exclusive = bootstrap::OPERATION
+            .try_lock()
+            .map_err(|_| "Another project setup operation is running. Wait for it to finish.")?;
+        bootstrap::ensure(
+            &request,
+            |plan| {
+                app.dialog()
+                    .message(plan.confirmation())
+                    .title("Install Unity requirements?")
+                    .kind(MessageDialogKind::Warning)
+                    .buttons(MessageDialogButtons::OkCancelCustom(
+                        "Accept and install".into(),
+                        "Cancel".into(),
+                    ))
+                    .blocking_show()
+            },
+            |progress| hosted::emit(&app, "requirements-progress", progress),
+        )?;
+        if !bootstrap::licence_ready(|progress| hosted::emit(&app, "requirements-progress", progress))? {
+            let open = app.dialog().message("Unity is installed, but no active Unity licence was reported.\n\nSign in and activate your licence in Unity Hub, then return to Setup and choose Create and validate project again. Your installed requirements will be reused. No project files have been created.\n\nOpen Unity Hub now?")
+                .title("Unity activation required")
+                .buttons(MessageDialogButtons::OkCancelCustom("Open Unity Hub".into(), "Not now".into()))
+                .blocking_show();
+            if open { logic::launch_hub()?; }
+            return Err("Unity licence activation is required. Finish activation in Unity Hub, then choose Create and validate project again. Installed requirements were kept; no project was created.".into());
+        }
         logic::create_project(request, |progress| {
             hosted::emit(&app, "setup-progress", progress);
         })
@@ -109,6 +136,9 @@ async fn run_existing_project(
     let operation = lifecycle::LIFECYCLE.command()?;
     tauri::async_runtime::spawn_blocking(move || {
         let _operation = operation;
+        let _exclusive = bootstrap::OPERATION
+            .try_lock()
+            .map_err(|_| "Another project setup operation is running. Wait for it to finish.")?;
         repair::run(request, |progress| {
             hosted::emit(&app, "existing-progress", progress);
         })
@@ -122,6 +152,9 @@ fn open_official_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
     let _operation = lifecycle::LIFECYCLE.command()?;
     let allowed = [
         "https://unity.com/download",
+        "https://unity.com/legal/editor-terms-of-service/software",
+        "https://developer.android.com/studio/terms",
+        "https://openjdk.org/legal/gplv2+ce.html",
         "https://docs.unity.com/en-us/unity-cli/use-unity-cli",
         "https://greenfield-registry.sdq.st/-/web/detail/com.sidequest.creator-sdk",
         "https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP",

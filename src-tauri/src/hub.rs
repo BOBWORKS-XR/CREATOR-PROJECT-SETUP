@@ -103,7 +103,7 @@ fn verified(path: &Path, binary: &Binary) -> bool {
         && fs::read(path).is_ok_and(|bytes| sha256(&bytes) == binary.sha256)
 }
 
-fn prepare_helper(progress: &impl Fn(&str)) -> Result<PathBuf, String> {
+pub(crate) fn prepare_helper(progress: &impl Fn(&str)) -> Result<PathBuf, String> {
     let release: Release =
         serde_json::from_str(include_str!("unity-cli-release.json")).map_err(|e| e.to_string())?;
     let binary = release
@@ -117,7 +117,7 @@ fn prepare_helper(progress: &impl Fn(&str)) -> Result<PathBuf, String> {
     fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
     let destination = folder.join(if cfg!(windows) { "unity.exe" } else { "unity" });
     if !verified(&destination, binary) {
-        progress("Downloading the official Unity Hub registration helper (about 21 MB).");
+        progress("Downloading the verified official Unity helper (about 21 MB).");
         let client = reqwest::blocking::Client::builder()
             .https_only(true)
             .redirect(reqwest::redirect::Policy::none())

@@ -1,20 +1,77 @@
 const { test, expect } = require('@playwright/test');
 
+test('fresh Windows PC offers one setup action without a wall of dependent errors', async ({ page }, testInfo) => {
+  await setup(page, { missingUnity: true, legacyHub: true });
+  await expect(page.locator('#create-button')).toHaveText('Set up and create project');
+  await expect(page.locator('#requirements-consent')).toBeVisible();
+  await expect(page.locator('#requirements .requirement.bad')).toHaveCount(1);
+  await expect(page.locator('#requirements')).toContainText('Will install: Android tools, Windows support and the URP template.');
+  await page.screenshot({ path: testInfo.outputPath('fresh-pc.png'), fullPage: true });
+  expect(await page.evaluate(() => window.calls.some(call => call.command === 'create_project'))).toBe(false);
+  await page.locator('#create-button').click();
+  await expect(page.locator('#open-project-button')).toBeEnabled();
+  expect(await page.evaluate(() => window.calls.filter(call => call.command === 'create_project').length)).toBe(1);
+});
+
+test('requirements progress switches to project progress and does not fake installer percent', async ({ page }, testInfo) => {
+  await setup(page, { missingUnity: true, missingHub: true, pending: true });
+  await page.locator('#create-button').click();
+  await expect(page.locator('#project-details')).toBeHidden();
+  await expect(page.locator('#unity-download-button')).toBeDisabled();
+  await page.evaluate(() => window.eventCallbacks['requirements-progress']({ payload: { stage: 'Downloading requirements', detail: 'Android Build Support', percent: 28 } }));
+  await expect(page.locator('#download-progress')).toHaveAttribute('value', '28');
+  await page.evaluate(() => window.eventCallbacks['requirements-progress']({ payload: { stage: 'Installing requirements', detail: 'Android Build Support', percent: null } }));
+  await expect(page.locator('#download-progress')).not.toHaveAttribute('value');
+  await expect(page.locator('#stage-progress')).toBeHidden();
+  await page.screenshot({ path: testInfo.outputPath('installing-requirements.png'), fullPage: true });
+  await page.evaluate(() => window.progressCallback({ payload: { step: 3, detail: 'Unity is compiling.' } }));
+  await expect(page.locator('#download-progress')).toBeHidden();
+  await expect(page.locator('#stage-progress')).toBeVisible();
+  await expect(page.locator('#activity-message')).toHaveText('Unity is compiling.');
+  await page.evaluate(() => { window.options.missingUnity = false; window.finishCreate(); });
+  await expect(page.locator('#open-project-button')).toBeEnabled();
+});
+
+for (const message of ['Setup cancelled before installation.', 'Not enough free space. Nothing was installed.', 'Unity requirement installation failed. Recheck before retrying.']) {
+  test(`prerequisite failure preserves inputs and permits a fresh check: ${message}`, async ({ page }) => {
+    await setup(page, { missingUnity: true, createError: message });
+    await page.locator('#project-name').fill('Keep this name');
+    await page.locator('#create-button').click();
+    await expect(page.locator('#result')).toContainText(message);
+    await expect(page.locator('#project-name')).toHaveValue('Keep this name');
+    await expect(page.locator('#create-button')).toBeEnabled();
+    await expect(page.locator('#open-project-button')).toBeHidden();
+    expect(await page.evaluate(() => Object.keys(window.eventCallbacks))).not.toContain('requirements-progress');
+  });
+}
+
+test('licence links are explicit and unsupported platforms do not offer automatic installs', async ({ page }) => {
+  await setup(page, { missingUnity: true });
+  await page.locator('[data-terms="android"]').click();
+  expect(await page.evaluate(() => window.calls.at(-1))).toEqual({ command: 'open_official_url', args: { url: 'https://developer.android.com/studio/terms' } });
+  await page.evaluate(() => { window.options.platform = 'linux'; });
+  await page.locator('#refresh-button').click();
+  await expect(page.locator('#create-button')).toBeDisabled();
+  await expect(page.locator('#requirements-consent')).toBeHidden();
+});
+
 async function setup(page, options = {}) {
   await page.addInitScript(options => {
     window.calls = [];
     window.options = options;
+    window.eventCallbacks = {};
     window.__TAURI__ = { event: { listen: async (name, callback) => {
-      window.progressCallback = callback;
-      return () => { window.progressCallback = null; };
+      window.eventCallbacks[name] = callback;
+      if (name === 'setup-progress') window.progressCallback = callback;
+      return () => { delete window.eventCallbacks[name]; if (name === 'setup-progress') window.progressCallback = null; };
     } }, core: { invoke: async (command, args) => {
       window.calls.push({ command, args });
       if (command === 'probe_environment') return {
-        platform: window.options.platform || 'windows', ready: true, hubInstalled: true, unityCliInstalled: false,
+        platform: window.options.platform || 'windows', ready: !window.options.missingUnity, hubInstalled: !window.options.missingHub, unityCliInstalled: false,
         hubVersion: window.options.legacyHub ? '3.14.4' : '3.21.1', hubAutoRegistration: !window.options.legacyHub,
-        suggestedProjectParent: 'F:\\UnityTest', blockers: [],
+        suggestedProjectParent: 'F:\\UnityTest', blockers: window.options.missingUnity ? ['Unity Editor 6000.3.21f1 is not installed.'] : [],
         recipe: { editorVersion: '6000.3.21f1', creatorSdkVersion: '4.0.14', urpVersion: '17.3.0', inputSystemVersion: '1.20.0' },
-        editors: [{ exactRecipe: true, androidPlayer: true, androidSdk: true, androidNdk: true, openJdk: true, windowsStandalone: true, urpTemplate: 'template.tgz' }],
+        editors: window.options.missingUnity ? [] : [{ exactRecipe: true, androidPlayer: true, androidSdk: true, androidNdk: true, openJdk: true, windowsStandalone: true, urpTemplate: 'template.tgz' }],
       };
       if (command === 'create_project') {
         if (window.options.pending) await new Promise(resolve => window.finishCreate = resolve);
@@ -41,7 +98,8 @@ async function setup(page, options = {}) {
     } } };
   }, options);
   await page.goto('http://127.0.0.1:4187');
-  await expect(page.locator('#create-button')).toBeEnabled();
+  if (options.missingUnity && options.platform && options.platform !== 'windows') await expect(page.locator('#create-button')).toBeDisabled();
+  else await expect(page.locator('#create-button')).toBeEnabled();
 }
 
 test('Hub failure preserves completed project and retry does not recreate it', async ({ page }) => {
@@ -60,7 +118,7 @@ test('Hub failure preserves completed project and retry does not recreate it', a
 test('legacy Hub does not receive a green registration claim and update retry preserves project', async ({ page }, testInfo) => {
   await setup(page, { legacyHub: true });
   await expect(page.locator('#requirements')).toContainText('Hub 3.14.4');
-  await expect(page.locator('#requirements')).toContainText('Hub 3.21.1+ required');
+  await expect(page.locator('#requirements')).toContainText('Automatic Hub registration is optional');
   await page.locator('#create-button').click();
   await expect(page.locator('#hub-result')).toHaveClass('hub-result pending');
   await expect(page.locator('#hub-result')).toContainText('3.14.4');
@@ -172,7 +230,7 @@ test('approved repair sends exact reviewed path and fingerprint, locks controls 
   await expect(page.locator('#new-mode')).toBeDisabled();
   await expect(page.locator('#existing-path')).toBeDisabled();
   await page.locator('#repair-button').dispatchEvent('click');
-  await page.evaluate(() => window.progressCallback({ payload: { step: 4, detail: 'Generating Creator node database.' } }));
+  await page.evaluate(() => window.eventCallbacks['existing-progress']({ payload: { step: 4, detail: 'Generating Creator node database.' } }));
   await expect(page.locator('#existing-detail')).toHaveText('Generating Creator node database.');
   await page.evaluate(() => window.finishRepair());
   await expect(page.locator('#existing-result')).toContainText('Validation passed');
@@ -181,7 +239,7 @@ test('approved repair sends exact reviewed path and fingerprint, locks controls 
   const calls = await page.evaluate(() => window.calls);
   expect(calls.filter(call => call.command === 'run_existing_project')).toEqual([{ command: 'run_existing_project', args: { request: { projectPath: 'F:\\UnityTest\\Existing project', fingerprint: 'reviewed-files-sha256', repair: true, approved: true } } }]);
   expect(calls.find(call => call.command === 'open_project').args.path).toBe('F:\\UnityTest\\Existing project');
-  expect(await page.evaluate(() => window.progressCallback)).toBe(null);
+  expect(await page.evaluate(() => Object.keys(window.eventCallbacks))).not.toContain('existing-progress');
   await expect(page.locator('#repair-button')).toBeDisabled();
 });
 

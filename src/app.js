@@ -71,7 +71,9 @@ function updateControls() {
     document.querySelector('#summary-path').textContent = createdProject || elements.parentFolder.value;
   }
   for (const field of [elements.projectName, elements.parentFolder, elements.browse]) field.disabled = locked;
-  elements.create.disabled = locked || !environment?.ready;
+  elements.create.disabled = locked || !environment || (!environment.ready && environment.platform !== 'windows');
+  elements.create.textContent = environment && !environment.ready && environment.platform === 'windows' ? 'Set up and create project' : 'Create and validate project';
+  document.querySelector('#requirements-consent').classList.toggle('hidden', !environment || environment.ready || environment.platform !== 'windows');
   elements.create.classList.toggle('hidden', Boolean(createdProject));
   elements.openProject.classList.toggle('hidden', !createdProject);
   elements.openProject.disabled = opening;
@@ -89,6 +91,7 @@ function updateControls() {
   restartHub.disabled = busy || inspecting || opening || checking;
   document.querySelector('#open-result-hub-button').disabled = busy || inspecting || opening;
   elements.createAnother.disabled = busy || opening || checking;
+  for (const button of [elements.hub, elements.unityDownload]) button.disabled = busy || inspecting || checking;
   elements.openProject.disabled = busy || opening;
   document.querySelector('#open-existing-button').disabled = busy || opening;
   const label = mode === 'existing' ? busy ? 'Working in Unity' : inspecting ? 'Inspecting project' : existingCompleted ? 'Project validated' : existingReport ? 'Review findings' : 'Select a project'
@@ -128,12 +131,14 @@ function renderEnvironment(report) {
   elements.requirements.innerHTML = [
     requirement('Unity Hub or Unity CLI', report.hubInstalled || report.unityCliInstalled, report.hubInstalled ? report.hubVersion ? `Hub ${report.hubVersion}` : 'Hub detected' : report.unityCliInstalled ? 'CLI detected' : 'Missing'),
     requirement(`Unity ${report.recipe.editorVersion}`, Boolean(editor), editor ? 'Installed' : 'Missing'),
-    requirement('Android Build Support', Boolean(editor?.androidPlayer), editor?.androidPlayer ? 'Installed' : 'Missing'),
-    requirement('Android SDK, NDK and OpenJDK', Boolean(editor?.androidSdk && editor?.androidNdk && editor?.openJdk), editor?.androidSdk && editor?.androidNdk && editor?.openJdk ? 'Installed' : 'Incomplete'),
-    requirement('Windows build support', Boolean(editor?.windowsStandalone), editor?.windowsStandalone ? 'Installed' : 'Missing'),
-    requirement('Official 3D URP template', Boolean(editor?.urpTemplate), editor?.urpTemplate ? 'Available' : 'Missing'),
+    ...(editor ? [
+      requirement('Android Build Support', Boolean(editor.androidPlayer), editor.androidPlayer ? 'Installed' : 'Missing'),
+      requirement('Android SDK, NDK and OpenJDK', Boolean(editor.androidSdk && editor.androidNdk && editor.openJdk), editor.androidSdk && editor.androidNdk && editor.openJdk ? 'Installed' : 'Incomplete'),
+      requirement('Windows build support', Boolean(editor.windowsStandalone), editor.windowsStandalone ? 'Installed' : 'Missing'),
+      requirement('Official 3D URP template', Boolean(editor.urpTemplate), editor.urpTemplate ? 'Available' : 'Missing'),
+    ] : ['<p class="recipe-line">Will install: Android tools, Windows support and the URP template.</p>']),
   ].join('');
-  if (!report.hubAutoRegistration) elements.requirements.innerHTML += requirement('Automatic Hub registration (optional)', false, 'Hub 3.21.1+ required');
+  if (!report.hubAutoRegistration) elements.requirements.innerHTML += '<p class="recipe-line">Automatic Hub registration is optional. It needs Hub 3.21.1 or newer; older Hub versions can add the finished project from disk.</p>';
 
   elements.blockers.classList.toggle('hidden', report.blockers.length === 0);
   elements.blockers.innerHTML = report.blockers.map(item => `<p>${escapeHtml(item)}</p>`).join('');
@@ -171,11 +176,13 @@ elements.hub.addEventListener('click', async () => {
 });
 
 elements.unityDownload.addEventListener('click', () => invoke('open_official_url', { url: 'https://unity.com/download' }).catch(showActionError));
+const licenceUrls = { unity: 'https://unity.com/legal/editor-terms-of-service/software', android: 'https://developer.android.com/studio/terms', openjdk: 'https://openjdk.org/legal/gplv2+ce.html' };
+for (const button of document.querySelectorAll('[data-terms]')) button.addEventListener('click', () => invoke('open_official_url', { url: licenceUrls[button.dataset.terms] }).catch(showActionError));
 elements.sdkSource.addEventListener('click', () => invoke('open_official_url', { url: 'https://greenfield-registry.sdq.st/-/web/detail/com.sidequest.creator-sdk' }).catch(showActionError));
 document.querySelector('#github-button').addEventListener('click', () => invoke('open_official_url', { url: 'https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP' }).catch(showActionError));
 
 elements.create.addEventListener('click', async () => {
-  if (mode !== 'new' || busy || inspecting || checking || createdProject || !environment?.ready) return;
+  if (mode !== 'new' || busy || inspecting || checking || createdProject || !environment || (!environment.ready && environment.platform !== 'windows')) return;
   busy = true;
   creating = true;
   updateControls();
@@ -193,8 +200,25 @@ elements.create.addEventListener('click', async () => {
   updateElapsed();
   const timer = setInterval(updateElapsed, 1000);
   let unlisten;
+  let unlistenRequirements;
   try {
-    unlisten = await window.CreatorRuntime.listen('setup-progress', event => renderProgress(event.payload));
+    unlistenRequirements = await window.CreatorRuntime.listen('requirements-progress', event => {
+      const value = event.payload;
+      elements.activityTitle.textContent = value.stage;
+      elements.activityMessage.textContent = value.detail;
+      document.querySelector('#stage-progress').classList.add('hidden');
+      elements.progressSteps.classList.add('hidden');
+      const download = document.querySelector('#download-progress');
+      download.classList.remove('hidden');
+      if (typeof value.percent === 'number' && Number.isFinite(value.percent) && value.percent >= 0 && value.percent <= 100) download.value = value.percent;
+      else download.removeAttribute('value');
+    });
+    unlisten = await window.CreatorRuntime.listen('setup-progress', event => {
+      document.querySelector('#download-progress').classList.add('hidden');
+      document.querySelector('#stage-progress').classList.remove('hidden');
+      elements.progressSteps.classList.remove('hidden');
+      renderProgress(event.payload);
+    });
     const result = await invoke('create_project', { request: {
       projectName: elements.projectName.value,
       parentDirectory: elements.parentFolder.value,
@@ -211,6 +235,8 @@ elements.create.addEventListener('click', async () => {
   } finally {
     clearInterval(timer);
     if (unlisten) unlisten();
+    if (unlistenRequirements) unlistenRequirements();
+    try { renderEnvironment(await invoke('probe_environment')); } catch { /* Retain the failure and last known requirements. */ }
     busy = false;
     creating = false;
     elements.activity.classList.add('hidden');

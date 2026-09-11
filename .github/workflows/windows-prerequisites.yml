@@ -1,0 +1,71 @@
+name: Windows Prerequisite Installation
+
+on:
+  workflow_dispatch:
+    inputs:
+      accept_test_licences:
+        description: Accept Unity, Android SDK/NDK and OpenJDK installation licences on a disposable runner
+        type: boolean
+        required: true
+        default: false
+  push:
+    branches: [feat/prerequisite-setup]
+    paths: [.github/workflows/windows-prerequisites.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: setup-prerequisites-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  clean-install:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Require explicit test approval
+        shell: pwsh
+        env:
+          EVENT: ${{ github.event_name }}
+          APPROVED: ${{ inputs.accept_test_licences }}
+        run: |
+          # The initial isolated branch run was explicitly approved by the owner.
+          # Manual reruns require fresh approval through the dispatch input.
+          if ($env:EVENT -ne 'push' -and $env:APPROVED -ne 'true') { throw 'Installation licences were not accepted for this test.' }
+          Get-Volume | Where-Object DriveLetter | Select-Object DriveLetter,SizeRemaining,Size
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
+      - run: cargo test --release --locked --manifest-path src-tauri/Cargo.toml
+      - run: cargo clippy --release --locked --all-targets --manifest-path src-tauri/Cargo.toml -- -D warnings
+      - name: Install actual Unity requirements on this disposable machine
+        shell: pwsh
+        env:
+          CREATOR_SETUP_ACCEPT_TEST_LICENSES: 'true'
+        run: |
+          cargo test --release --locked --manifest-path src-tauri/Cargo.toml bootstrap::tests::disposable_install_smoke -- --ignored --exact --nocapture 2>&1 | Tee-Object prerequisite-install.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload installation evidence, without Unity account credentials
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prerequisite-install-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            prerequisite-install.log
+            ${{ runner.temp }}/creator-prerequisite-acceptance.json
+            C:/Users/runneradmin/AppData/Local/CreatorProjectSetup/logs/requirements-*/

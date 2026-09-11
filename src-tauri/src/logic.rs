@@ -178,6 +178,7 @@ fn hub_candidates() -> Vec<PathBuf> {
 
 fn editor_roots() -> Vec<PathBuf> {
     let mut roots = Vec::new();
+    roots.extend(crate::bootstrap::known_editor_roots());
     if let Some(custom) = env::var_os("CREATOR_SETUP_EDITOR_ROOT") {
         roots.push(PathBuf::from(custom));
     }
@@ -284,7 +285,7 @@ fn find_unity_cli() -> Option<PathBuf> {
     candidates.into_iter().find(|path| path.is_file())
 }
 
-fn inspect_editor(root: PathBuf) -> Option<EditorInstallation> {
+pub(crate) fn inspect_editor(root: PathBuf) -> Option<EditorInstallation> {
     let version = root.file_name()?.to_string_lossy().to_string();
     let executable = executable_for(&root);
     if !executable.is_file() {
@@ -293,15 +294,44 @@ fn inspect_editor(root: PathBuf) -> Option<EditorInstallation> {
     let playback = editor_data(&root).join("PlaybackEngines");
     let android = find_case_insensitive_child(&playback, "AndroidPlayer");
     let windows = find_case_insensitive_child(&playback, "WindowsStandaloneSupport");
-    let android_sdk = android
-        .as_ref()
-        .is_some_and(|path| path.join("SDK").is_dir());
-    let android_ndk = android
-        .as_ref()
-        .is_some_and(|path| path.join("NDK").is_dir());
-    let open_jdk = android
-        .as_ref()
-        .is_some_and(|path| path.join("OpenJDK").is_dir());
+    let android_sdk = android.as_ref().is_some_and(|path| {
+        path.join(if cfg!(windows) {
+            "SDK/platform-tools/adb.exe"
+        } else {
+            "SDK/platform-tools/adb"
+        })
+        .is_file()
+            && versioned_tool(
+                &path.join("SDK/build-tools"),
+                if cfg!(windows) { "aapt2.exe" } else { "aapt2" },
+            )
+            && versioned_tool(
+                &path.join("SDK/cmdline-tools"),
+                if cfg!(windows) {
+                    "bin/sdkmanager.bat"
+                } else {
+                    "bin/sdkmanager"
+                },
+            )
+    });
+    let android_ndk = android.as_ref().is_some_and(|path| {
+        path.join("NDK/source.properties").is_file()
+            && path
+                .join(if cfg!(windows) {
+                    "NDK/ndk-build.cmd"
+                } else {
+                    "NDK/ndk-build"
+                })
+                .is_file()
+    });
+    let open_jdk = android.as_ref().is_some_and(|path| {
+        path.join(if cfg!(windows) {
+            "OpenJDK/bin/java.exe"
+        } else {
+            "OpenJDK/bin/java"
+        })
+        .is_file()
+    });
     let template = find_urp_template(&editor_data(&root));
     let exact_recipe = version == EDITOR_VERSION;
     let ready = exact_recipe
@@ -323,6 +353,15 @@ fn inspect_editor(root: PathBuf) -> Option<EditorInstallation> {
         windows_standalone: windows.is_some(),
         urp_template: template.map(|path| path.to_string_lossy().to_string()),
         ready,
+    })
+}
+
+fn versioned_tool(parent: &Path, tool: &str) -> bool {
+    fs::read_dir(parent).ok().is_some_and(|entries| {
+        entries
+            .filter_map(Result::ok)
+            .take(64)
+            .any(|entry| entry.path().join(tool).is_file())
     })
 }
 
@@ -718,14 +757,7 @@ fn write_receipt(project: &Path, value: &Value) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-pub fn create_project(
-    request: CreateRequest,
-    progress: impl Fn(SetupProgress),
-) -> Result<CreationResult, String> {
-    progress(SetupProgress::new(
-        1,
-        "Checking project path and required Unity modules.",
-    ));
+pub(crate) fn creation_target(request: &CreateRequest) -> Result<PathBuf, String> {
     let project_name = request.project_name.trim();
     validate_project_name(project_name)?;
     let parent = PathBuf::from(request.parent_directory.trim());
@@ -739,6 +771,19 @@ pub fn create_project(
             target.display()
         ));
     }
+    Ok(target)
+}
+
+pub fn create_project(
+    request: CreateRequest,
+    progress: impl Fn(SetupProgress),
+) -> Result<CreationResult, String> {
+    progress(SetupProgress::new(
+        1,
+        "Checking project path and required Unity modules.",
+    ));
+    let target = creation_target(&request)?;
+    let project_name = request.project_name.trim();
     let environment = probe_environment();
     if !environment.ready {
         return Err(format!(
@@ -944,6 +989,51 @@ mod tests {
     use super::*;
 
     const PACKAGE_RESET_LOG: &str = include_str!("../../tests/fixtures/unity-package-reset.txt");
+
+    #[test]
+    fn empty_android_directories_are_not_installed_tools() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join(EDITOR_VERSION);
+        let executable = executable_for(&root);
+        fs::create_dir_all(executable.parent().unwrap()).unwrap();
+        fs::write(&executable, "fixture").unwrap();
+        let android = editor_data(&root).join("PlaybackEngines/AndroidPlayer");
+        for child in ["SDK", "NDK", "OpenJDK"] {
+            fs::create_dir_all(android.join(child)).unwrap();
+        }
+        let report = inspect_editor(root.clone()).unwrap();
+        assert!(!report.android_sdk && !report.android_ndk && !report.open_jdk && !report.ready);
+        let tools = if cfg!(windows) {
+            [
+                "SDK/platform-tools/adb.exe",
+                "SDK/build-tools/36.0.0/aapt2.exe",
+                "SDK/cmdline-tools/16.0/bin/sdkmanager.bat",
+                "NDK/source.properties",
+                "NDK/ndk-build.cmd",
+                "OpenJDK/bin/java.exe",
+            ]
+        } else {
+            [
+                "SDK/platform-tools/adb",
+                "SDK/build-tools/36.0.0/aapt2",
+                "SDK/cmdline-tools/16.0/bin/sdkmanager",
+                "NDK/source.properties",
+                "NDK/ndk-build",
+                "OpenJDK/bin/java",
+            ]
+        };
+        for tool in tools {
+            let path = android.join(tool);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(path, "fixture").unwrap();
+        }
+        let report = inspect_editor(root).unwrap();
+        assert!(report.android_sdk && report.android_ndk && report.open_jdk);
+        assert!(
+            !report.ready,
+            "Other requirements must still pass independently"
+        );
+    }
 
     #[test]
     fn receipts_identify_build_and_time_without_copying_raw_logs() {
