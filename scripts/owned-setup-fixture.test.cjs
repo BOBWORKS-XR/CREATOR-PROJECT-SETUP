@@ -48,8 +48,14 @@ for (const environment of [
 
 test('candidate and public baseline pins have complete SHA-256 digests', () => {
   const pin = require('./installed-acceptance-pin.json');
-  for (const key of ['installerSha256', 'executableSha256', 'baselineSha256', 'baselineExecutableSha256']) {
+  for (const key of ['installerSha256', 'executableSha256']) {
     assert.match(pin[key], /^[a-f0-9]{64}$/);
   }
   assert.match(pin.sourceRevision, /^[a-f0-9]{40}$/);
+  assert.deepEqual(Object.keys(pin.baselines).sort(), ['0.2.2', '0.3.0-alpha.1']);
+  for (const [version, baseline] of Object.entries(pin.baselines)) {
+    assert.equal(baseline.url, `https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/download/v${version}/Creator-Project-Setup-${version}-Windows-setup.exe`);
+    assert.match(baseline.installerSha256, /^[a-f0-9]{64}$/);
+    assert.match(baseline.executableSha256, /^[a-f0-9]{64}$/);
+  }
 });

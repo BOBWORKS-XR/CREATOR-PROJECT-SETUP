@@ -18,6 +18,10 @@ jobs:
   installed:
     runs-on: windows-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        baseline: ['0.2.2', '0.3.0-alpha.1']
     steps:
       - uses: actions/checkout@v6
         with:
@@ -46,12 +50,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Could not download the pinned candidate artifact.' }
       - name: Install public baseline and test the exact candidate update
         shell: pwsh
-        run: ./scripts/Test-InstalledCandidate.ps1 -CandidateDirectory dist/installed-source/dist/windows-candidate/candidate
+        run: ./scripts/Test-InstalledCandidate.ps1 -CandidateDirectory dist/installed-source/dist/windows-candidate/candidate -BaselineVersion '${{ matrix.baseline }}'
       - name: Upload installed acceptance evidence (not a release)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: creator-project-setup-installed-acceptance-${{ github.sha }}
+          name: creator-project-setup-installed-acceptance-${{ matrix.baseline }}-${{ github.sha }}
           if-no-files-found: warn
           retention-days: 14
           path: |

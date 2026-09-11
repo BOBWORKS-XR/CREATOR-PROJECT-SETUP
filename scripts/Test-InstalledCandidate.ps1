@@ -1,4 +1,7 @@
-param([Parameter(Mandatory = $true)][string]$CandidateDirectory)
+param(
+    [Parameter(Mandatory = $true)][string]$CandidateDirectory,
+    [ValidateSet('0.2.2', '0.3.0-alpha.1')][string]$BaselineVersion = '0.2.2'
+)
 $ErrorActionPreference = 'Stop'
 # This script runs real installers. Check the environment before resolving targets.
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:RUNNER_OS -ne 'Windows') {
@@ -10,6 +13,7 @@ $candidateRoot = (Resolve-Path -LiteralPath $CandidateDirectory).Path
 $allowed = [IO.Path]::GetFullPath((Join-Path $repo 'dist')) + '\'
 if (-not $candidateRoot.StartsWith($allowed, [StringComparison]::OrdinalIgnoreCase)) { throw 'Candidate must belong to this checkout.' }
 $pin = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'installed-acceptance-pin.json') -Raw | ConvertFrom-Json
+$baselinePin = $pin.baselines.$BaselineVersion
 $version = (Get-Content -LiteralPath (Join-Path $repo 'package.json') -Raw | ConvertFrom-Json).version
 if ($version -cne $pin.version) { throw 'Review the version-specific acceptance pin before testing another candidate.' }
 $installer = Join-Path $candidateRoot "Creator-Project-Setup-$version-Windows-setup.exe"
@@ -40,6 +44,7 @@ $report = [ordered]@{
     passed = $false; version = $version; candidateRunId = $pin.runId; candidateSource = $pin.sourceRevision
     runner = $env:RUNNER_OS; productionUserMachineUsed = $false; publicationReady = $false
     installedUpgradeTested = $false; guiStartupTested = $false; guiNormalCloseTested = $false
+    baselineVersion = $BaselineVersion
     settingsEvidence = 'Synthetic sentinels only. No project, repair receipt or real user preferences were created.'
     notTested = @('Unity/project creation or repair', 'Interactive installer UI', 'Busy project creation',
         'Historical uninstaller', 'Hub adoption or self-update', 'macOS/Linux')
@@ -101,14 +106,14 @@ try {
     Require ($candidate.checks.packagedLicenseNotices -and $candidate.checks.portableZipVerified) 'Candidate has no verified license-complete packaging evidence.'
     $report.installerSha256 = Hash $installer
     $report.executableSha256 = Hash $payload
-    $baseline = Join-Path $output 'baseline-0.2.2.exe'
-    Invoke-WebRequest -Uri $pin.baselineUrl -OutFile $baseline
-    Require ((Hash $baseline) -ceq $pin.baselineSha256) 'Public baseline hash mismatch.'
+    $baseline = Join-Path $output "baseline-$BaselineVersion.exe"
+    Invoke-WebRequest -Uri $baselinePin.url -OutFile $baseline
+    Require ((Hash $baseline) -ceq $baselinePin.installerSha256) 'Public baseline hash mismatch.'
     $report.baselineSha256 = Hash $baseline
     # /R is absent. Neither installer is allowed to launch the app automatically.
-    Run-Installer $baseline ('/S /NS /D=' + $installRoot) 0 'Clean public 0.2.2 installation'
-    Require ((Hash $installedExe) -ceq $pin.baselineExecutableSha256) 'Baseline installed EXE hash mismatch.'
-    Require ((Get-ItemProperty -LiteralPath $uninstallKey).DisplayVersion -ceq '0.2.2') 'Baseline registry version mismatch.'
+    Run-Installer $baseline ('/S /NS /D=' + $installRoot) 0 "Clean public $BaselineVersion installation"
+    Require ((Hash $installedExe) -ceq $baselinePin.executableSha256) 'Baseline installed EXE hash mismatch.'
+    Require ((Get-ItemProperty -LiteralPath $uninstallKey).DisplayVersion -ceq $BaselineVersion) 'Baseline registry version mismatch.'
     Require ((Get-Item -LiteralPath $productKey).GetValue('') -eq $installRoot) 'Baseline registration path mismatch.'
     $sentinels = @()
     foreach ($root in $dataRoots) {

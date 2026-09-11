@@ -28,7 +28,7 @@ Send raw diagnostics privately only when needed. Nothing in this release makes
 unreviewed logs safe to post publicly.
 
 Use a private support conversation or open a
-[GitHub issue](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/issues/new)
+[GitHub issue](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/issues/new?template=setup-failure.md)
 with reviewed/redacted information:
 
 ```text

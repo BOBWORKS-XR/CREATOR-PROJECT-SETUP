@@ -1,11 +1,20 @@
 {
   "repository": "BOBWORKS-XR/CREATOR-PROJECT-SETUP",
-  "runId": "34527681202",
-  "sourceRevision": "4ba97911ce135faa2f1ea495dd01bf1ea0c1f55d",
-  "version": "0.3.0-alpha.1",
-  "installerSha256": "0fdef05fa42fb88cb4bba4929d87065d5114a202c8c2d59ddb3672dbab99f3be",
-  "executableSha256": "e160787c2e5e1ff0012e2e0aa74ecfa516434e05d2c255f6d11340724690e6f0",
-  "baselineUrl": "https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/download/v0.2.2/Creator-Project-Setup-0.2.2-Windows-setup.exe",
-  "baselineSha256": "b3f9ed80e9319c4ce7339836310bbfbf7342da665fef155937a5701eda2229e5",
-  "baselineExecutableSha256": "23006194bd8214b92c980dc1042466d598d6d1daaed26819ab697d67159db49b"
+  "runId": "34587957462",
+  "sourceRevision": "a8878c49a4c4cb57268c45484baa9e889b79bac2",
+  "version": "0.3.0-alpha.2",
+  "installerSha256": "204fbbd74c5f8ee6ecc2379b9f7bc197e61d206560caed41ac5594f1a93d5eaf",
+  "executableSha256": "d38c3434e2e330c941eac81048efa9eaada866c3cb8f5fcc0ba75df46edc8813",
+  "baselines": {
+    "0.2.2": {
+      "url": "https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/download/v0.2.2/Creator-Project-Setup-0.2.2-Windows-setup.exe",
+      "installerSha256": "b3f9ed80e9319c4ce7339836310bbfbf7342da665fef155937a5701eda2229e5",
+      "executableSha256": "23006194bd8214b92c980dc1042466d598d6d1daaed26819ab697d67159db49b"
+    },
+    "0.3.0-alpha.1": {
+      "url": "https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/download/v0.3.0-alpha.1/Creator-Project-Setup-0.3.0-alpha.1-Windows-setup.exe",
+      "installerSha256": "0fdef05fa42fb88cb4bba4929d87065d5114a202c8c2d59ddb3672dbab99f3be",
+      "executableSha256": "e160787c2e5e1ff0012e2e0aa74ecfa516434e05d2c255f6d11340724690e6f0"
+    }
+  }
 }
