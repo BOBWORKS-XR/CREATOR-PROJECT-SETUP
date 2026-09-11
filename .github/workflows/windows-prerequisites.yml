@@ -37,6 +37,31 @@ jobs:
           # Manual reruns require fresh approval through the dispatch input.
           if ($env:EVENT -ne 'push' -and $env:APPROVED -ne 'true') { throw 'Installation licences were not accepted for this test.' }
           Get-Volume | Where-Object DriveLetter | Select-Object DriveLetter,SizeRemaining,Size
+      - name: Prepare the approved clean Windows fixture
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:RUNNER_OS -ne 'Windows') { throw 'Fixture cleanup is only allowed on a disposable GitHub-hosted Windows runner.' }
+          $hubRoot = Join-Path $env:ProgramFiles 'Unity Hub'
+          $hub = Join-Path $hubRoot 'Unity Hub.exe'
+          if (Test-Path -LiteralPath $hub) {
+            $uninstaller = Join-Path $hubRoot 'Uninstall Unity Hub.exe'
+            if (-not (Test-Path -LiteralPath $uninstaller -PathType Leaf)) { throw 'The preinstalled Hub has no expected uninstaller.' }
+            $resolved = (Resolve-Path -LiteralPath $uninstaller).Path
+            if ($resolved -ne $uninstaller -or (Get-Item -LiteralPath $hubRoot).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Unexpected Hub fixture path.' }
+            $signature = Get-AuthenticodeSignature -LiteralPath $uninstaller
+            if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Unity') { throw 'The fixture uninstaller is not a valid Unity-signed executable.' }
+            Write-Output "Removing only the runner's preinstalled Unity Hub: $resolved"
+            $process = Start-Process -FilePath $resolved -ArgumentList '/S' -WindowStyle Hidden -PassThru
+            if (-not $process.WaitForExit(120000)) { throw 'The fixture uninstaller did not finish. Nothing was force-closed.' }
+            if ($process.ExitCode -ne 0) { throw "Hub fixture uninstall failed: $($process.ExitCode)" }
+            $deadline = (Get-Date).AddSeconds(30)
+            while ((Test-Path -LiteralPath $hub) -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 1 }
+            if (Test-Path -LiteralPath $hub) { throw 'Hub still exists; this is not a clean fixture.' }
+          }
+          $editorRoot = Join-Path $env:ProgramFiles 'Unity/Hub/Editor'
+          if (Test-Path -LiteralPath $editorRoot) {
+            if (@(Get-ChildItem -LiteralPath $editorRoot -Directory).Count -gt 0) { throw 'Unexpected preinstalled Editor. No Editor folders will be deleted.' }
+          }
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -47,6 +72,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          cache-on-failure: true
       - run: npm ci
       - run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
       - run: cargo test --release --locked --manifest-path src-tauri/Cargo.toml
