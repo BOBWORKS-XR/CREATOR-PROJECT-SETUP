@@ -16,9 +16,12 @@ Published `0.3.0-alpha.2` does not install missing Unity requirements.
    Windows may request administrator approval.
 5. Setup checks actual Editor/tool files and the installed URP template. An
    installer exit code alone is not considered sufficient.
-6. If Unity reports no active licence, open Unity Hub from the prompt, complete
-   sign-in/activation, and return to the same form. Installed prerequisites are
-   retained; no project folder is created before this check passes.
+6. If an active Unity licence cannot be verified, open Unity Hub from the prompt,
+   complete first-run setup and sign-in/activation, and return to the same form.
+   An authentication/configuration response is not proof of an inactive licence;
+   it still blocks project creation until an active licence is verified.
+   Installed prerequisites are retained; no project folder is created before
+   this check passes.
 7. Continue through the existing Creator SDK project creation, compilation,
    Visual Scripting initialization and second-session validation.
 
@@ -82,21 +85,75 @@ left untouched. Application storage checks were not relaxed for CI.
 
 Run [34595273184](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34595273184)
 captured the exact CLI preview format for a committed regression fixture.
-The current installation run is
-[34597376140](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34597376140).
-It tests cancel-before-install, reuse, isolated OpenJDK repair, execution of
-Java/javac/ADB/NDK clang, and detection of missing activation. Its final outcome
-must be recorded before release. A failed preflight is not installation proof.
+Run [34598566899](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34598566899)
+saved successful full-install and isolated OpenJDK-repair receipts. Its test also
+passed reuse and Java/javac/ADB/NDK clang execution before the final licence query
+returned exit 4 (configuration/context required). The overall run was cancelled
+near that failure and is not a passing gate. The saved logs, not a quiet live
+log display, establish that installation completed.
 
-Separate gates remain for real module repair, declined elevation, interrupted
-downloads and retry, fresh-machine sign-in/activation, and Creator project
-creation after a fresh install. Do not label these verified from unit tests.
+Source `a002320` handles read-only licence-query authentication/configuration
+exits as an unverified licence requiring a user handoff; unrelated errors still
+fail. It also displays the CLI's actual `msg` progress text. The rerun
+[34602021240](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34602021240)
+records checkpoints after each phase, executed tool versions, and bounded
+process/download activity without command lines or account data. It passed on
+2026-09-11 at source `a00232046092f36181c960cd94e9608edfa7c675`:
+
+| Actual disposable Windows check | Result |
+| --- | --- |
+| Cancel before installation, no Editor/modules/project created | Passed |
+| Hub 3.21.1 download, valid pinned signature and installation | Passed |
+| Unity 6000.3.21f1, required Android tools, Windows support, URP template | Passed |
+| Reuse verified installation without a second installation approval | Passed |
+| Remove only owned `java.exe`, reinstall the OpenJDK module | Passed |
+| Execute Java/javac 17.0.18, ADB 36.0.0, NDK clang 18.0.3 | Passed |
+| Unverified licence requires user handoff, no project created | Passed |
+| Unity account used or licence activation tested | No |
+
+The actual installation/repair smoke took 928.59 seconds; the complete job,
+including fixture preparation and compilation, took about 23 minutes. The
+acceptance receipt reports `completed`, `prerequisitesVerified`,
+`cancellationVerified`, `existingInstallReused`, `missingJdkRepaired` and
+`activationHandoffRequired` as true. `projectCreated`, `unityAccountUsed` and
+`licenseActivationTested` remain false. This proves the tested automated
+installation route, not a fresh-user project or native dialog interaction.
+Future runs use opt-in workflow dispatch; the temporary push trigger was removed.
+
+Separate gates remain for declined elevation, interrupted downloads and retry,
+fresh-machine sign-in/activation, and Creator project creation after a fresh
+install. Only isolated OpenJDK repair has real module-repair evidence; this does
+not prove every damaged installation can be repaired. Do not label untested
+routes verified from unit tests.
 
 Creator Hub currently pins the older Setup executable and drops the new event.
 An isolated Hub patch (`a02cf14817b23546958516996a6d09bea0518301`) adds native and
 renderer `requirements-progress` allowlists and independent bounded event
 throttles, with forwarding/session/transition tests. It is not published or
 pinned to this executable. Do not update that pin before candidate acceptance.
+
+## Other-PC Acceptance
+
+Use the exact standalone alpha.3 candidate, not the Setup version currently
+embedded in the published Hub. Keep the portable package and its notices
+together. Do not uninstall existing Editors or delete projects for this test.
+
+1. Choose a new project name and parent folder with enough free space. Select
+   **Set up and create project** and review **Accept and install**.
+2. Approve Windows prompts only for the expected verified Unity installers.
+   Expect download/component stages; installation is not a timed percentage.
+3. If prompted, complete Unity Hub first-run setup, sign-in and activation.
+   Return to Setup and select **Create and validate project**. It should reuse
+   the installed requirements, not download the whole Editor again.
+4. Success means the new project passes compilation, Creator/Visual Scripting
+   setup and reopen validation. Open it in Unity to check for first-run dialogs
+   or compile errors. This is not an Android/Windows build or headset test.
+
+On failure, retain the exact displayed error, candidate version and local report
+path. Review the receipt/log before sharing it, following [Reporting](REPORTING.md).
+If a project folder was already created, preserve it; Create does not resume or
+overwrite failed projects. A retry must use a new name unless a separate reviewed
+repair is explicitly chosen.
 
 ## Source Contracts
 

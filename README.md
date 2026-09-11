@@ -108,7 +108,10 @@ not a feature of the published diagnostics hotfix.
 
 The isolated [alpha.3 candidate](docs/PREREQUISITE-CANDIDATE.md) adds an approved
 Windows installation flow behind **Set up and create project**. Real
-clean-machine acceptance is in progress; this is not yet a released feature.
+disposable-Windows installation, reuse, isolated Java repair and the
+licence-handoff check [passed](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34602021240).
+Fresh-user sign-in and project creation after that installation still need
+real-PC acceptance; this is not yet a released feature.
 
 - Detect Unity Hub, Unity CLI, compatible Editors, and required build modules.
 - Create a new project from the matching Editor's official 3D URP template.

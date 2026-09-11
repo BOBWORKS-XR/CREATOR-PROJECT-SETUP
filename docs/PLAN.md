@@ -52,6 +52,14 @@ An isolated Windows-first alpha.3 implementation is under validation. See the
 [candidate flow and release gates](PREREQUISITE-CANDIDATE.md). The historical gap
 below still describes published alpha.2; do not treat the candidate as released.
 
+On 2026-09-11, the approved disposable Windows test installed the actual pinned
+Hub, Editor and required tools, reused the installation, repaired isolated
+OpenJDK damage, executed Java/javac/ADB/NDK clang and required an activation
+handoff without using an account or creating a project. A separate healthy-PC
+project creation/reopen smoke passed. These are two separate results, not proof
+of the complete fresh-user account-to-project flow. Native sign-in/UAC and that
+combined flow remain release gates, as does acceptance of the paired Hub build.
+
 A fresh-PC report on 2026-09-11 shows Unity Hub 3.13.0 present but the pinned
 Editor, modules and template absent. Source inspection confirms that the app
 only probes those requirements and opens Hub; it never runs an Editor/module
