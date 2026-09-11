@@ -84,6 +84,21 @@ jobs:
         run: |
           cargo test --release --locked --manifest-path src-tauri/Cargo.toml bootstrap::tests::disposable_install_smoke -- --ignored --exact --nocapture 2>&1 | Tee-Object prerequisite-install.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Stage diagnostics on one volume, without Unity account credentials
+        if: always()
+        shell: pwsh
+        run: |
+          $destination = Join-Path $env:RUNNER_TEMP 'prerequisite-evidence'
+          [void](New-Item -ItemType Directory -Path $destination -Force)
+          foreach ($file in @((Join-Path $PWD 'prerequisite-install.log'), (Join-Path $env:RUNNER_TEMP 'creator-prerequisite-acceptance.json'))) {
+            if (Test-Path -LiteralPath $file -PathType Leaf) { Copy-Item -LiteralPath $file -Destination $destination }
+          }
+          $logs = Join-Path $env:LOCALAPPDATA 'CreatorProjectSetup/logs'
+          if (Test-Path -LiteralPath $logs -PathType Container) {
+            Get-ChildItem -LiteralPath $logs -Directory -Filter 'requirements-*' | ForEach-Object {
+              Copy-Item -LiteralPath $_.FullName -Destination $destination -Recurse
+            }
+          }
       - name: Upload installation evidence, without Unity account credentials
         if: always()
         uses: actions/upload-artifact@v4
@@ -91,7 +106,4 @@ jobs:
           name: prerequisite-install-${{ github.sha }}
           retention-days: 14
           if-no-files-found: warn
-          path: |
-            prerequisite-install.log
-            ${{ runner.temp }}/creator-prerequisite-acceptance.json
-            C:/Users/runneradmin/AppData/Local/CreatorProjectSetup/logs/requirements-*/
+          path: ${{ runner.temp }}/prerequisite-evidence/

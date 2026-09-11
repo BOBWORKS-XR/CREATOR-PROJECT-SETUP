@@ -939,7 +939,10 @@ mod tests {
         };
         assert!(!parent.join(&request.project_name).exists());
         let cancelled = ensure(&request, |_| false, |_| {}).unwrap_err();
-        assert!(cancelled.contains("cancelled before installation"));
+        assert!(
+            cancelled.contains("cancelled before installation"),
+            "Preflight did not reach cancellation: {cancelled}"
+        );
         assert!(!logic::probe_environment().hub_installed);
         assert!(logic::probe_environment().editors.is_empty());
         assert!(!parent.join(&request.project_name).exists());
