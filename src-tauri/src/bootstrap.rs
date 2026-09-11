@@ -320,6 +320,48 @@ fn compact(value: &str) -> String {
         .collect()
 }
 
+fn dependency_notice(line: &[u8]) -> bool {
+    let Ok(line) = std::str::from_utf8(line) else {
+        return false;
+    };
+    let Some(rest) = line.trim_end_matches('\r').strip_prefix("Adding module ") else {
+        return false;
+    };
+    let Some((child, parent)) = rest.split_once(" as dependency of ") else {
+        return false;
+    };
+    let Some(parent) = parent.strip_suffix('.') else {
+        return false;
+    };
+    [child, parent].into_iter().all(|id| {
+        !id.is_empty()
+            && id.len() <= 128
+            && id
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || b"-._+".contains(&c))
+    })
+}
+
+fn parse_report(mut bytes: &[u8], label: &str) -> Result<Value, String> {
+    // beta.9 prints dependency notices on stdout even with --quiet --json.
+    // Permit only that exact prelude on install previews, then parse ONE complete
+    // JSON document. Never scan past unknown warnings/errors to find a success.
+    if label == "preview" {
+        while let Some(end) = bytes.iter().position(|c| *c == b'\n') {
+            if !dependency_notice(&bytes[..end]) {
+                break;
+            }
+            bytes = &bytes[end + 1..];
+        }
+    }
+    let value: Value = serde_json::from_slice(bytes)
+        .map_err(|_| format!("Unity returned an invalid {label} report. Review the requirement logs before retrying."))?;
+    if value["success"] != true {
+        return Err(format!("Unity could not verify its {label} report. Review the requirement logs before retrying."));
+    }
+    Ok(value["data"].clone())
+}
+
 fn frame_progress(frame: &Value) -> Option<Progress> {
     if frame["type"] != "progress" {
         return None;
@@ -505,12 +547,7 @@ fn run_cli(
         if out.overflow {
             return Err("Unity's requirement report was too large. Nothing was installed.".into());
         }
-        let value: Value = serde_json::from_slice(&out.bytes)
-            .map_err(|_| "Unity returned an invalid requirement report. Nothing was installed.")?;
-        if value["success"] != true {
-            return Err("Unity could not verify its requirements. Nothing was installed.".into());
-        }
-        Ok(value["data"].clone())
+        parse_report(&out.bytes, label)
     });
     result
 }
@@ -813,6 +850,29 @@ mod tests {
     use super::*;
 
     #[test]
+    fn captured_fresh_install_preview_allows_only_known_dependency_prelude() {
+        let fixture = include_bytes!("../tests/fixtures/cli-install-preview.txt");
+        let data = parse_report(fixture, "preview").unwrap();
+        assert_eq!(data["alreadyInstalled"], false);
+        assert_eq!(preview_size(&data).unwrap(), 6_954_591_148);
+        assert!(parse_report(fixture, "paths").is_err());
+        for noise in [
+            "Error: failed\n",
+            "unexpected warning\n",
+            "Adding module ;bad as dependency of android.\n",
+        ] {
+            let output = format!("{noise}{{\"success\":true,\"data\":{{}}}}");
+            assert!(parse_report(output.as_bytes(), "preview").is_err());
+        }
+        assert!(parse_report(
+            b"Adding module android as dependency of test.\n{\"success\":false}",
+            "preview"
+        )
+        .is_err());
+        assert!(parse_report(b"{\"success\":true} trailing-error", "preview").is_err());
+    }
+
+    #[test]
     fn cli_only_install_reuse_depends_on_activation_handoff() {
         assert!(can_reuse(true, false, false));
         assert!(!can_reuse(true, false, true));
@@ -995,6 +1055,38 @@ mod tests {
         .unwrap();
         assert!(java.is_file());
         assert!(logic::probe_environment().ready);
+        let mut tool_versions = serde_json::Map::new();
+        for (relative, arg) in [
+            ("OpenJDK/bin/java.exe", "-version"),
+            ("OpenJDK/bin/javac.exe", "-version"),
+            ("SDK/platform-tools/adb.exe", "version"),
+            (
+                "NDK/toolchains/llvm/prebuilt/windows-x86_64/bin/clang.exe",
+                "--version",
+            ),
+        ] {
+            use std::os::windows::process::CommandExt;
+            let executable = root
+                .join("Editor/Data/PlaybackEngines/AndroidPlayer")
+                .join(relative);
+            let output = Command::new(executable)
+                .arg(arg)
+                .creation_flags(0x08000000)
+                .stdin(Stdio::null())
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "Installed tool cannot run: {relative}"
+            );
+            let version = format!(
+                "{}{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(!version.trim().is_empty());
+            tool_versions.insert(relative.into(), json!(compact(&version)));
+        }
         assert!(
             !licence_ready(|_| {}).unwrap(),
             "This disposable test must not acquire a Unity account licence"
@@ -1003,7 +1095,7 @@ mod tests {
             !parent.join(&request.project_name).exists(),
             "Prerequisite testing must not pretend it created a Unity project"
         );
-        let report = json!({"setupVersion":env!("CARGO_PKG_VERSION"), "editorVersion":EDITOR_VERSION,"prerequisitesVerified":true,"cancellationVerified":true,"existingInstallReused":true,"missingJdkRepaired":true,"inactiveLicenceDetected":true,"projectCreated":false,"unityAccountUsed":false,"licenseActivationTested":false});
+        let report = json!({"setupVersion":env!("CARGO_PKG_VERSION"), "editorVersion":EDITOR_VERSION,"prerequisitesVerified":true,"cancellationVerified":true,"existingInstallReused":true,"missingJdkRepaired":true,"toolVersions":tool_versions,"inactiveLicenceDetected":true,"projectCreated":false,"unityAccountUsed":false,"licenseActivationTested":false});
         fs::write(
             parent.join("creator-prerequisite-acceptance.json"),
             serde_json::to_vec_pretty(&report).unwrap(),
