@@ -48,20 +48,15 @@ async fn create_project(
             .map_err(|_| "Another project setup operation is running. Wait for it to finish.")?;
         bootstrap::ensure(
             &request,
-            |plan| {
-                app.dialog()
-                    .message(plan.confirmation())
-                    .title("Install Unity requirements?")
-                    .kind(MessageDialogKind::Warning)
-                    .buttons(MessageDialogButtons::OkCancelCustom(
-                        "Accept and install".into(),
-                        "Cancel".into(),
-                    ))
-                    .blocking_show()
-            },
+            |plan| approve_installation(&app, plan),
             |progress| hosted::emit(&app, "requirements-progress", progress),
         )?;
         if !bootstrap::licence_ready(|progress| hosted::emit(&app, "requirements-progress", progress))? {
+            if !logic::probe_environment().hub_installed {
+                bootstrap::ensure_activation_hub(&request,
+                    |plan| approve_installation(&app, plan),
+                    |progress| hosted::emit(&app, "requirements-progress", progress))?;
+            }
             let open = app.dialog().message("Unity is installed, but no active Unity licence was reported.\n\nSign in and activate your licence in Unity Hub, then return to Setup and choose Create and validate project again. Your installed requirements will be reused. No project files have been created.\n\nOpen Unity Hub now?")
                 .title("Unity activation required")
                 .buttons(MessageDialogButtons::OkCancelCustom("Open Unity Hub".into(), "Not now".into()))
@@ -75,6 +70,18 @@ async fn create_project(
     })
     .await
     .map_err(|error| format!("Setup worker failed: {error}"))?
+}
+
+fn approve_installation(app: &tauri::AppHandle, plan: &bootstrap::Plan) -> bool {
+    app.dialog()
+        .message(plan.confirmation())
+        .title("Install Unity requirements?")
+        .kind(MessageDialogKind::Warning)
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            "Accept and install".into(),
+            "Cancel".into(),
+        ))
+        .blocking_show()
 }
 
 #[tauri::command]

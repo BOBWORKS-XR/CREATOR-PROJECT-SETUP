@@ -59,6 +59,9 @@ pub struct Plan {
 
 impl Plan {
     pub fn confirmation(&self) -> String {
+        if self.action == Action::None && self.install_hub {
+            return "Install Unity Hub so you can activate Unity?\n\nYour existing Editor and build tools will be reused. Unity's official signed Hub installer will be downloaded.\n\nBy selecting Accept and install, you agree to the linked Unity terms. Windows may ask for administrator approval. You will complete sign-in and licence activation in Unity Hub. Existing projects and Editor versions will not be removed.".into();
+        }
         format!(
             "Install the missing Unity requirements, then create your project?\n\nUnity {EDITOR_VERSION}; Android SDK, NDK and OpenJDK; Windows support.{}\nEditor: {}\nDownload cache: {}\nEditor/modules download: {:.1} GB.{}\nConservative free-space reserve: {:.1} GB (not an exact installed size).\n\nBy selecting Accept and install, you agree to the Unity Software Terms and the Android SDK/NDK and OpenJDK licences linked in Setup. Unity/Windows may still ask for sign-in, activation or administrator approval.\n\nExisting projects and other Editor versions will not be removed. Installers must finish before Setup can close.",
             if self.install_hub { " Unity Hub will also be installed." } else { "" },
@@ -608,9 +611,30 @@ pub fn ensure(
     approve: impl Fn(&Plan) -> bool,
     emit: impl Fn(Progress),
 ) -> Result<(), String> {
+    ensure_inner(request, false, approve, emit)
+}
+
+pub fn ensure_activation_hub(
+    request: &logic::CreateRequest,
+    approve: impl Fn(&Plan) -> bool,
+    emit: impl Fn(Progress),
+) -> Result<(), String> {
+    ensure_inner(request, true, approve, emit)
+}
+
+fn can_reuse(ready: bool, hub_installed: bool, require_hub: bool) -> bool {
+    ready && (!require_hub || hub_installed)
+}
+
+fn ensure_inner(
+    request: &logic::CreateRequest,
+    require_hub: bool,
+    approve: impl Fn(&Plan) -> bool,
+    emit: impl Fn(Progress),
+) -> Result<(), String> {
     let target = logic::creation_target(request)?;
     let initial = logic::probe_environment();
-    if initial.ready {
+    if can_reuse(initial.ready, initial.hub_installed, require_hub) {
         if cfg!(windows) && free_space(target.parent().unwrap())? < 8 * GIB {
             return Err("Project creation needs an 8 GiB free-space reserve for package downloads and imports. Choose a location with more space before starting.".into());
         }
@@ -787,6 +811,28 @@ pub fn ensure(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cli_only_install_reuse_depends_on_activation_handoff() {
+        assert!(can_reuse(true, false, false));
+        assert!(!can_reuse(true, false, true));
+        assert!(can_reuse(true, true, true));
+        assert!(!can_reuse(false, true, false));
+        let plan = Plan {
+            action: Action::None,
+            install_hub: true,
+            editor_root: PathBuf::new(),
+            cache_root: PathBuf::new(),
+            modules: vec![],
+            download_bytes: 0,
+            reserve_bytes: 0,
+            log_directory: PathBuf::new(),
+        };
+        assert!(plan
+            .confirmation()
+            .contains("existing Editor and build tools will be reused"));
+        assert!(!plan.confirmation().contains("0.0 GB"));
+    }
 
     #[test]
     #[cfg(windows)]

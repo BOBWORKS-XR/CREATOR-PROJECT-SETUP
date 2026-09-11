@@ -73,6 +73,14 @@ test('licence links are explicit and unsupported platforms do not offer automati
   await expect(page.locator('#requirements-consent')).toBeHidden();
 });
 
+test('CLI-only ready installations keep Unity terms accessible for an activation handoff', async ({ page }) => {
+  await setup(page, { missingHub: true });
+  await expect(page.locator('#create-button')).toHaveText('Create and validate project');
+  await expect(page.locator('[data-terms="unity"]')).toBeVisible();
+  await page.locator('[data-terms="unity"]').click();
+  expect(await page.evaluate(() => window.calls.at(-1))).toEqual({ command: 'open_official_url', args: { url: 'https://unity.com/legal/editor-terms-of-service/software' } });
+});
+
 async function setup(page, options = {}) {
   await page.addInitScript(options => {
     window.calls = [];

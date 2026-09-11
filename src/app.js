@@ -73,7 +73,7 @@ function updateControls() {
   for (const field of [elements.projectName, elements.parentFolder, elements.browse]) field.disabled = locked;
   elements.create.disabled = locked || !environment || (!environment.ready && environment.platform !== 'windows');
   elements.create.textContent = environment && !environment.ready && environment.platform === 'windows' ? 'Set up and create project' : 'Create and validate project';
-  document.querySelector('#requirements-consent').classList.toggle('hidden', !environment || environment.ready || environment.platform !== 'windows');
+  document.querySelector('#requirements-consent').classList.toggle('hidden', !environment || (environment.ready && environment.hubInstalled) || environment.platform !== 'windows');
   elements.create.classList.toggle('hidden', Boolean(createdProject));
   elements.openProject.classList.toggle('hidden', !createdProject);
   elements.openProject.disabled = opening;

@@ -29,6 +29,10 @@ approvals. macOS/Linux automatic installation is not implemented.
 - An existing old Hub is not silently upgraded; automatic project registration
   still requires Hub 3.21.1 or newer. New projects can be added from disk in an
   older Hub.
+- A ready, licensed CLI-only installation remains usable without adding Hub.
+  If activation is missing and Hub is absent, the candidate offers an approved
+  Hub installation before the sign-in handoff. That native CLI-only activation
+  route still needs user acceptance testing.
 - Missing Android modules can be added to the verified managed Editor. A
   damaged core Editor or unregistered/conflicting installation is blocked with
   instructions instead of being overwritten or duplicated.
@@ -51,8 +55,8 @@ approvals. macOS/Linux automatic installation is not implemented.
 
 ## Validation Gates
 
-The local candidate passes 51 Rust unit tests, 2 executable metadata
-integration tests, 42 UI tests and strict Clippy. These are not clean-machine
+The local candidate passes 52 Rust unit tests, 2 executable metadata
+integration tests, 43 UI tests and strict Clippy. These are not clean-machine
 installation proof.
 
 The healthy-machine creation smoke passed on 2026-09-11: existing requirements
@@ -80,10 +84,11 @@ Separate gates remain for real module repair, declined elevation, interrupted
 downloads and retry, fresh-machine sign-in/activation, and Creator project
 creation after a fresh install. Do not label these verified from unit tests.
 
-Creator Hub currently pins the older Setup executable. Its native and renderer
-event allowlists must add `requirements-progress` with focused tests before
-hosting a newly pinned candidate; the current public Hub drops that event.
-Do not update its executable pin before candidate acceptance.
+Creator Hub currently pins the older Setup executable and drops the new event.
+An isolated Hub patch (`a02cf14817b23546958516996a6d09bea0518301`) adds native and
+renderer `requirements-progress` allowlists and independent bounded event
+throttles, with forwarding/session/transition tests. It is not published or
+pinned to this executable. Do not update that pin before candidate acceptance.
 
 ## Source Contracts
 
