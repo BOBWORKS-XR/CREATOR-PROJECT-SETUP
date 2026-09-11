@@ -32,6 +32,24 @@ test('requirements progress switches to project progress and does not fake insta
   await expect(page.locator('#open-project-button')).toBeEnabled();
 });
 
+for (const width of [390, 560]) {
+  test(`fresh-PC installation controls fit at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 760 });
+    await setup(page, { missingUnity: true, missingHub: true });
+    await expect(page.locator('#create-button')).toBeEnabled();
+    await expect(page.locator('#requirements-consent')).toBeVisible();
+    const layout = await page.evaluate(() => {
+      const form = document.querySelector('#project-details').getBoundingClientRect();
+      const consent = document.querySelector('#requirements-consent').getBoundingClientRect();
+      const button = document.querySelector('#create-button').getBoundingClientRect();
+      return { scrollWidth: document.documentElement.scrollWidth, viewport: innerWidth, fits: consent.left >= form.left && consent.right <= form.right && consent.top >= button.bottom };
+    });
+    expect(layout.scrollWidth).toBeLessThanOrEqual(layout.viewport);
+    expect(layout.fits).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath('fresh-pc-small.png'), fullPage: true });
+  });
+}
+
 for (const message of ['Setup cancelled before installation.', 'Not enough free space. Nothing was installed.', 'Unity requirement installation failed. Recheck before retrying.']) {
   test(`prerequisite failure preserves inputs and permits a fresh check: ${message}`, async ({ page }) => {
     await setup(page, { missingUnity: true, createError: message });

@@ -52,7 +52,7 @@ approvals. macOS/Linux automatic installation is not implemented.
 ## Validation Gates
 
 The local candidate passes 51 Rust unit tests, 2 executable metadata
-integration tests, 40 UI tests and strict Clippy. These are not clean-machine
+integration tests, 42 UI tests and strict Clippy. These are not clean-machine
 installation proof.
 
 The healthy-machine creation smoke passed on 2026-09-11: existing requirements
@@ -68,8 +68,13 @@ These are not installed-upgrade acceptance of alpha.3.
 
 The owner approved a disposable Windows CI installation of Unity and required
 Android tools without using their Unity account. The first real installation
-run is [34593430878](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34593430878).
-Results and remaining acceptance gaps must be recorded before release.
+run [34593430878](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34593430878)
+stopped before installation because the stock GitHub image already included
+Unity Hub. The fixture was corrected to uninstall only that image's signed Hub
+using its own uninstaller, never deleting Editor folders. The replacement run is
+[34594398051](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34594398051).
+It also tests cancel-before-install, reuse, isolated OpenJDK repair, and detection
+of missing activation. Results must be recorded before release.
 
 Separate gates remain for real module repair, declined elevation, interrupted
 downloads and retry, fresh-machine sign-in/activation, and Creator project
