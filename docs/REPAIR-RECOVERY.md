@@ -35,3 +35,37 @@ safe to resume an interrupted repair.
 
 No automated project deletion, Library reset, material conversion, or scene
 reconstruction is part of recovery.
+
+## New Project Package Download Failure
+
+A prerelease report on Unity 6000.3.21f1 ended with Package Manager failing to
+download `com.unity.timeline` from `download.packages.unity.com` with `ECONNRESET`,
+then Unity exiting with code 1. Earlier licensing errors recovered. The log also
+contained a `.creator-project-setup` directory-name warning; that warning is not
+established as the cause of the package-download failure.
+
+The error establishes a connection reset, not whether a firewall, proxy, service
+interruption, or another network issue caused it. Check connectivity to the host
+reported by Unity. If it persists, use Unity's
+[Package Manager network guidance](https://docs.unity3d.com/6000.3/Documentation/Manual/upm-config-network.html)
+to check the required endpoints and any proxy configuration. Do not disable TLS
+verification or broadly disable security software.
+
+The 0.3.0-alpha.2 diagnostic change shows the package, host, connection error and exit
+code when Unity's final package-resolution failure can be identified. It reads a
+bounded log tail and retains the log locally, without uploading it. Unknown
+failures still link to the log rather than guessing a cause.
+
+Keep the failed project and its log. Once connectivity is restored, the current
+new-project flow can make a fresh attempt with a **different project name**; it
+cannot resume or overwrite the failed folder. A partial creation may still have
+its temporary validator, which deliberately blocks the existing-project repair
+flow until reviewed. Do not remove it or delete the project just to bypass that
+check. Assisted recovery of that folder needs a separate inspection.
+
+The regression fixture contains only the relevant, sanitized log shape. Raw user
+logs can contain machine, session and licensing identifiers and should not be
+attached to public issues or committed without review/redaction. Automated tests
+of error handling do not prove the reporter's network or project now works.
+
+For report details and a copy-ready template, see [Reporting a setup failure](REPORTING.md).

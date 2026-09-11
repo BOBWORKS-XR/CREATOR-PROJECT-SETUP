@@ -9,21 +9,34 @@ packaging support. Windows is the first physically tested platform; macOS and
 Linux packages remain preview quality until their full Unity workflows have
 been exercised on real machines.
 
-## Windows Prerelease: 0.3.0-alpha.1
+## Windows Prerelease: 0.3.0-alpha.2
 
-This is the Creator Hub compatibility testing branch. The coordinated Windows
-prereleases are published; stable users can continue using 0.2.2 below.
+This diagnostics hotfix makes failed setup reports more useful. It identifies
+recognized Unity package-download errors and records the Setup version and time
+in local creation receipts. Stable users can continue using 0.2.2 below.
 
-**Start with [Creator Hub 0.1.0-alpha.3](https://github.com/BOBWORKS-XR/CREATOR-HUB/releases/tag/v0.1.0-alpha.3)**
-to install or update the Creator apps you need, then open their hosted interfaces
-inside Hub. Downloads are verified and installation requires your approval.
+**[Download Project Setup 0.3.0-alpha.2](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.3.0-alpha.2)**
+as a Windows installer or portable ZIP. Hub is optional. Keep the included
+`licenses` folder with the portable app. Close Setup normally before upgrading.
+
+[Creator Hub](https://github.com/BOBWORKS-XR/CREATOR-HUB/releases) can manage the
+Creator apps, but hosting a new Setup build requires matching Hub acceptance
+pins. Use this hotfix standalone until a compatible Hub update is available.
+Verified downloads do not install without your approval.
 Creator Works MCP does not require Project Setup: an existing Unity project can
 use MCP on its own. Install Project Setup when you need its project-creation or
 reviewed validation/repair workflow.
 
-For standalone use, get the
-[Project Setup 0.3.0-alpha.1 installer or portable ZIP](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.3.0-alpha.1).
-Hub is optional. Keep the included `licenses` folder with the portable app.
+- Clear package/host/connection errors and Unity exit status when identified.
+- Versioned, timestamped local creation receipts for optional support reports.
+- Explicit partial-project recovery limits: no automatic retry or overwrite.
+- [Reporting guide](docs/REPORTING.md), including log locations and privacy checks.
+- No automatic log uploads, analytics, or changes to network security settings.
+
+See [0.3.0-alpha.2 release notes](docs/RELEASE-0.3.0-alpha.2.md). This is an
+error-reporting improvement, not a claim that package-download failures are fixed.
+
+### Included From Alpha.1
 
 - Compact interface and shared Creator app navigation.
 - Read-only app identity for Creator Hub and a local embedded-Setup preview.
@@ -36,8 +49,9 @@ Hub is optional. Keep the included `licenses` folder with the portable app.
 
 The coordinated suite includes [Creator Hub](https://github.com/BOBWORKS-XR/CREATOR-HUB)
 and [Creator Works MCP](https://github.com/BOBWORKS-XR/CREATOR-WORKS-UNITY-MCP).
-The [native suite tests](https://github.com/BOBWORKS-XR/CREATOR-HUB/actions/runs/34536443333)
-passed for clean installations, existing older apps, and MCP without Setup.
+The [alpha.1 native suite tests](https://github.com/BOBWORKS-XR/CREATOR-HUB/actions/runs/34536443333)
+passed for clean installations, existing older apps, and MCP without Setup, using
+the earlier alpha.1 artifacts. They are not acceptance of the new alpha.2 files.
 They cover verified installs/upgrades, installed-file hashes, fixture settings
 preservation, hosted interfaces, and refusal to close Hub during a folder-picker
 operation. Persistent Hub adoption and shortcut takeover are not advertised.

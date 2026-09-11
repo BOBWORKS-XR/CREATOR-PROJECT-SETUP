@@ -18,6 +18,7 @@ async function setup(page, options = {}) {
       };
       if (command === 'create_project') {
         if (window.options.pending) await new Promise(resolve => window.finishCreate = resolve);
+        if (window.options.createError) throw window.options.createError;
         if (window.options.failCreate) throw 'Project already exists. No files were changed.';
         return { success: true, projectPath: `${args.request.parentDirectory}\\${args.request.projectName}`, message: 'Project validated.', hub: window.options.legacyHub ? { registered: false, requiresHubUpdate: true, message: 'Unity Hub 3.14.4 uses the old registry. Update to 3.21.1 or use Add > Add project from disk.' } : { registered: !window.options.failHub, refreshPending: !window.options.failHub, message: window.options.failHub ? 'Download failed. Your project is ready to open.' : 'Project registered. A running Unity Hub may need a full restart to show it in Projects.' } };
       }
@@ -277,6 +278,25 @@ test('creation failure allows retry without claiming a completed project', async
   await expect(page.locator('#project-name')).toHaveValue('My Creator Space');
   await expect(page.locator('#project-summary')).toBeHidden();
 });
+
+for (const width of [980, 560]) {
+  test(`package download failure stays actionable at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 760 });
+    const createError = 'Unity could not download a required package: com.unity.timeline from download.packages.unity.com (ECONNRESET: connection reset). Check your connection and any proxy/firewall rules for this host. Unity exit code: 1. Review E:\\UnityTest\\Example\\.creator-project-setup\\unity-setup.log. The project was preserved. Setup is incomplete. For a fresh attempt, keep this folder and choose a different project name. Create does not resume or overwrite existing folders.';
+    await setup(page, { createError });
+    await page.locator('#create-button').click();
+    await expect(page.locator('#result')).toContainText(createError);
+    await expect(page.locator('#result')).not.toHaveClass(/success/);
+    await expect(page.locator('#open-project-button')).toBeHidden();
+    await expect(page.locator('#project-name')).toBeEnabled();
+    await expect(page.locator('#activity')).toBeHidden();
+    expect(await page.evaluate(() => window.calls.filter(call => call.command === 'create_project').length)).toBe(1);
+    expect(await page.evaluate(() => window.calls.some(call => ['register_project', 'open_project'].includes(call.command)))).toBe(false);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.locator('#result').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: testInfo.outputPath('package-download-failure.png'), fullPage: true });
+  });
+}
 
 test('creating another project explicitly unlocks a new name', async ({ page }) => {
   await setup(page);

@@ -7,7 +7,7 @@ use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tar::Archive;
 use wait_timeout::ChildExt;
 
@@ -536,6 +536,86 @@ pub(crate) fn validation_script() -> String {
         .replace("@@INPUT_SYSTEM_VERSION@@", INPUT_SYSTEM_VERSION)
 }
 
+fn log_tail(log: &Path, limit: u64) -> Option<String> {
+    let mut file = File::open(log).ok()?;
+    let length = file.metadata().ok()?.len();
+    file.seek(SeekFrom::Start(length.saturating_sub(limit)))
+        .ok()?;
+    let mut bytes = Vec::new();
+    file.take(limit).read_to_end(&mut bytes).ok()?;
+    Some(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+fn package_failure_detail(text: &str) -> Option<String> {
+    // Only diagnose a package-resolution block followed immediately by Unity's
+    // abort, not a warning that was recovered before a different failure.
+    let (_, section) = text.rsplit_once("An error occurred while resolving packages:")?;
+    let (details, _) = section.split_once("Exiting without the bug reporter.")?;
+    if details
+        .lines()
+        .any(|line| !line.trim().is_empty() && !line.starts_with(' ') && !line.starts_with('\t'))
+    {
+        return None;
+    }
+    for line in details.lines() {
+        let Some((package, connection)) = line.trim().split_once(": Cannot connect to '") else {
+            continue;
+        };
+        let Some((host, error)) = connection.split_once("' (error code: ") else {
+            continue;
+        };
+        let Some((code, _)) = error.split_once(')') else {
+            continue;
+        };
+        let meaning = match code {
+            "ECONNRESET" => "connection reset",
+            "ECONNREFUSED" => "connection refused",
+            "ETIMEDOUT" | "ESOCKETTIMEDOUT" => "connection timed out",
+            "ENOTFOUND" | "EAI_AGAIN" => "host name lookup failed",
+            _ => continue,
+        };
+        // Never copy arbitrary log text, URLs, credentials or license data into
+        // the UI/receipt. Only bounded package and DNS identifiers are allowed.
+        if package.is_empty()
+            || package.len() > 128
+            || !package
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || b"._-".contains(&c))
+            || host.len() > 253
+            || !host.split('.').all(|label| {
+                !label.is_empty()
+                    && label.len() <= 63
+                    && label
+                        .bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || c == b'-')
+            })
+        {
+            continue;
+        }
+        return Some(format!(
+            "Unity could not download a required package: {package} from {host} ({code}: {meaning}). Check your connection and any proxy/firewall rules for this host."
+        ));
+    }
+    Some(
+        "Unity could not resolve required packages. The Unity log contains the package errors."
+            .into(),
+    )
+}
+
+fn unity_failure(log: &Path, exit_code: Option<i32>) -> String {
+    let detail = log_tail(log, 65536)
+        .and_then(|text| package_failure_detail(&text))
+        .unwrap_or_else(|| "Unity setup failed.".into());
+    let status = exit_code.map_or_else(
+        || "Unity stopped without an exit code.".into(),
+        |code| format!("Unity exit code: {code}."),
+    );
+    format!(
+        "{detail} {status} Review {}. The project was preserved.",
+        crate::repair::display_path(log)
+    )
+}
+
 fn unity_progress(target: &Path, log: &Path, step: u8) -> Option<SetupProgress> {
     let progress_path = target.join(".creator-project-setup/unity-progress.json");
     if let Ok(file) = File::open(progress_path) {
@@ -545,13 +625,7 @@ fn unity_progress(target: &Path, log: &Path, step: u8) -> Option<SetupProgress> 
             }
         }
     }
-    let mut file = File::open(log).ok()?;
-    let length = file.metadata().ok()?.len();
-    file.seek(SeekFrom::Start(length.saturating_sub(32768)))
-        .ok()?;
-    let mut bytes = Vec::new();
-    file.take(32768).read_to_end(&mut bytes).ok()?;
-    let text = String::from_utf8_lossy(&bytes);
+    let text = log_tail(log, 32768)?;
     text.lines().rev().find_map(|line| {
         let asset = line
             .strip_prefix("Start importing ")?
@@ -605,10 +679,7 @@ pub(crate) fn run_unity(
     };
     match exit {
         Ok(Some(status)) if status.success() => Ok(()),
-        Ok(Some(_)) => Err(format!(
-            "Unity setup failed. Review {}. The project was preserved.",
-            crate::repair::display_path(log)
-        )),
+        Ok(Some(status)) => Err(unity_failure(log, status.code())),
         result => {
             let _ = child.kill();
             let _ = child.wait();
@@ -625,7 +696,22 @@ fn write_receipt(project: &Path, value: &Value) -> Result<PathBuf, String> {
     fs::create_dir_all(&folder)
         .map_err(|error| format!("Cannot create receipt folder: {error}"))?;
     let path = folder.join("setup-receipt.json");
-    let text = serde_json::to_string_pretty(value)
+    let mut receipt = value.clone();
+    receipt["schemaVersion"] = json!(1);
+    receipt["setupVersion"] = json!(env!("CARGO_PKG_VERSION"));
+    receipt["recordedAtUnixMs"] = json!(SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("Cannot timestamp receipt: {error}"))?
+        .as_millis());
+    receipt["platform"] = json!(env::consts::OS);
+    receipt["architecture"] = json!(env::consts::ARCH);
+    receipt["logPaths"] = json!(["unity-setup.log", "unity-reopen-validation.log"]
+        .iter()
+        .map(|name| folder.join(name))
+        .filter(|log| log.is_file())
+        .map(|log| crate::repair::display_path(&log))
+        .collect::<Vec<_>>());
+    let text = serde_json::to_string_pretty(&receipt)
         .map_err(|error| format!("Cannot serialize setup receipt: {error}"))?;
     fs::write(&path, format!("{text}\n"))
         .map_err(|error| format!("Cannot write setup receipt: {error}"))?;
@@ -792,7 +878,10 @@ pub fn create_project(
             message: "Creator SDK project compiled, initialized Visual Scripting, and passed checks after reopening.".into(),
             hub,
         })
-    })();
+    })()
+    .map_err(|error| format!(
+        "{error} Setup is incomplete. For a fresh attempt, keep this folder and choose a different project name. Create does not resume or overwrite existing folders."
+    ));
 
     if let Err(error) = &setup {
         let _ = write_receipt(
@@ -853,6 +942,157 @@ pub fn launch_hub() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const PACKAGE_RESET_LOG: &str = include_str!("../../tests/fixtures/unity-package-reset.txt");
+
+    #[test]
+    fn receipts_identify_build_and_time_without_copying_raw_logs() {
+        let root = tempfile::tempdir().unwrap();
+        let folder = root.path().join(".creator-project-setup");
+        fs::create_dir(&folder).unwrap();
+        let log = folder.join("unity-setup.log");
+        fs::write(&log, "private raw log contents").unwrap();
+        for success in [false, true] {
+            let original = json!({"success": success, "stage": "test", "recipe": recipe()});
+            let path = write_receipt(root.path(), &original).unwrap();
+            let text = fs::read_to_string(path).unwrap();
+            let value: Value = serde_json::from_str(&text).unwrap();
+            assert_eq!(value["setupVersion"], env!("CARGO_PKG_VERSION"));
+            assert_eq!(value["schemaVersion"], 1);
+            assert!(value["recordedAtUnixMs"].as_u64().unwrap() > 0);
+            assert_eq!(value["success"], success);
+            assert_eq!(value["recipe"], original["recipe"]);
+            assert_eq!(
+                value["logPaths"],
+                json!([crate::repair::display_path(&log)])
+            );
+            assert!(!text.contains("private raw log contents"));
+            assert!(original.get("setupVersion").is_none());
+        }
+        assert_eq!(fs::read_to_string(log).unwrap(), "private raw log contents");
+    }
+
+    #[test]
+    fn package_reset_diagnostic_uses_fatal_error_not_recovered_warnings() {
+        for text in [
+            PACKAGE_RESET_LOG.to_owned(),
+            PACKAGE_RESET_LOG.replace('\n', "\r\n"),
+        ] {
+            let message = package_failure_detail(&text).unwrap();
+            assert!(message.contains("com.unity.timeline from download.packages.unity.com"));
+            assert!(message.contains("ECONNRESET: connection reset"));
+            assert!(message.contains("Check your connection"));
+            assert!(!message.contains("Licensing"));
+            assert!(!message.contains("directory name"));
+        }
+    }
+
+    #[test]
+    fn package_diagnostic_requires_terminal_failure_and_handles_unknown_errors() {
+        let before_abort = PACKAGE_RESET_LOG
+            .split("Exiting without the bug reporter.")
+            .next()
+            .unwrap();
+        assert!(package_failure_detail(before_abort).is_none());
+        let recovered = PACKAGE_RESET_LOG.replace(
+            "Exiting without the bug reporter.",
+            "[Package Manager] Resolution recovered\nScripts have compiler errors.\nExiting without the bug reporter.",
+        );
+        assert!(package_failure_detail(&recovered).is_none());
+        let later_failure = format!(
+            "{before_abort}\nAn error occurred while resolving packages:\n  Package version does not exist.\nExiting without the bug reporter."
+        );
+        let message = package_failure_detail(&later_failure).unwrap();
+        assert!(message.contains("could not resolve required packages"));
+        assert!(!message.contains("connection"));
+        let unknown = PACKAGE_RESET_LOG.replace("ECONNRESET", "UNKNOWN_ERROR");
+        assert!(!package_failure_detail(&unknown)
+            .unwrap()
+            .contains("Check your connection"));
+    }
+
+    #[test]
+    fn package_diagnostic_only_copies_bounded_identifiers() {
+        for host in [
+            "https://user:secret@example.test/?token=private".to_owned(),
+            "<script>alert(1)</script>".to_owned(),
+            "a".repeat(254),
+        ] {
+            let text = PACKAGE_RESET_LOG.replace("download.packages.unity.com", &host);
+            let message = package_failure_detail(&text).unwrap();
+            assert_eq!(message, "Unity could not resolve required packages. The Unity log contains the package errors.");
+        }
+        let text = PACKAGE_RESET_LOG.replace("com.unity.timeline", &"p".repeat(129));
+        assert!(!package_failure_detail(&text)
+            .unwrap()
+            .contains("could not download"));
+        for code in [
+            "ECONNREFUSED",
+            "ETIMEDOUT",
+            "ESOCKETTIMEDOUT",
+            "ENOTFOUND",
+            "EAI_AGAIN",
+        ] {
+            assert!(
+                package_failure_detail(&PACKAGE_RESET_LOG.replace("ECONNRESET", code))
+                    .unwrap()
+                    .contains(code)
+            );
+        }
+    }
+
+    #[test]
+    fn failure_message_reads_only_bounded_tail_and_preserves_log() {
+        let root = tempfile::tempdir().unwrap();
+        let log = root.path().join("unity.log");
+        let mut bytes = vec![b'x'; 100_000];
+        bytes.push(0xff);
+        bytes.extend_from_slice(PACKAGE_RESET_LOG.as_bytes());
+        fs::write(&log, &bytes).unwrap();
+        assert!(log_tail(&log, 100).unwrap().len() <= 100);
+        let message = unity_failure(&log, Some(1));
+        assert!(message.contains("ECONNRESET"));
+        assert!(message.contains("Unity exit code: 1"));
+        assert!(message.contains("The project was preserved"));
+        assert_eq!(fs::read(&log).unwrap(), bytes);
+        fs::write(&log, b"Scripts have compiler errors.\n").unwrap();
+        assert!(unity_failure(&log, Some(1)).starts_with("Unity setup failed."));
+        let missing = unity_failure(&root.path().join("missing.log"), None);
+        assert!(missing.contains("without an exit code"));
+        assert!(!missing.contains("Check your connection"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn run_unity_reports_failed_child_but_never_diagnoses_success() {
+        let root = tempfile::tempdir().unwrap();
+        let fake_editor = root.path().join("Unity fixture.cmd");
+        let log = root.path().join("unity-setup.log");
+        fs::write(&fake_editor, "@exit /b 1\r\n").unwrap();
+        fs::write(&log, PACKAGE_RESET_LOG).unwrap();
+        let failed = run_unity(
+            fake_editor.to_str().unwrap(),
+            root.path(),
+            "Test.Configure",
+            &log,
+            3,
+            &|_| {},
+        )
+        .unwrap_err();
+        assert!(failed.contains("com.unity.timeline"));
+        assert!(failed.contains("Unity exit code: 1"));
+        fs::write(&fake_editor, "@exit /b 0\r\n").unwrap();
+        run_unity(
+            fake_editor.to_str().unwrap(),
+            root.path(),
+            "Test.Validate",
+            &log,
+            5,
+            &|_| {},
+        )
+        .unwrap();
+        assert_eq!(fs::read_to_string(&log).unwrap(), PACKAGE_RESET_LOG);
+    }
 
     #[test]
     fn recipe_is_pinned() {
