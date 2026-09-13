@@ -1,7 +1,7 @@
 # Creator Project Setup 0.3.0-alpha.6
 
-Windows prerequisite-installation prerelease. Publication preparation is in
-progress; stable 0.2.2 and earlier prerelease assets remain unchanged.
+Windows prerequisite-installation prerelease. Stable 0.2.2 and earlier
+prerelease assets remain unchanged.
 
 ## What Changed Since Alpha.2
 
@@ -68,11 +68,23 @@ project compilation/Visual Scripting/reopen validation, and a matched hosted run
 with normal close. The hosted retry required observer assistance with the test
 harness. Fully unattended testing of that final harness remains separate.
 
-Earlier [disposable Windows prerequisite installation](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34602021240)
-installed and checked the real Hub, Editor and Android tools, reused the install,
-repaired isolated OpenJDK damage, and verified the activation handoff without
-using a Unity account. It did not create a project. That earlier source and the
-separate licensed-PC project tests do not prove the complete fresh-user flow.
+[Fresh disposable Windows prerequisite acceptance](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754298548)
+passed on the same alpha.6 source. It installed and checked the real Hub, Editor
+and Android tools, reused the install, repaired isolated OpenJDK damage, executed
+Java/javac, ADB and NDK clang, and required the activation handoff without using
+a Unity account. The native test took 1,437.87 seconds, excluding CI preparation.
+Actual Hub HTTP transfers and Unity Editor/Android module downloads produced
+byte and recent-rate measurements. Quick/cache-hit components can still have
+no speed reading. These are observations, not an independent speed benchmark.
+This test did not create a project or activate a licence. It and the separate
+licensed-PC project tests do not prove the complete fresh-user flow.
+
+[Paired Hub staged native acceptance](https://github.com/BOBWORKS-XR/CREATOR-HUB/actions/runs/34754847040)
+passed clean-install, older-app upgrade and MCP-only routes with the exact files.
+It verified signed staged Setup metadata, approved installs, hosted views,
+retained state and busy-close refusal. The MCP-only route leaves Setup uninstalled.
+Hub's release records the separate public-feed retest; staged-cache acceptance
+does not itself prove public discovery, Unity creation or Hub self-update.
 
 Known limitations:
 

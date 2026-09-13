@@ -1,6 +1,6 @@
 # Windows Prerelease Evidence
 
-## Alpha.6 Preparation (2026-09-13)
+## Alpha.6 Release (2026-09-13)
 
 Source-clean [candidate run 34754280271](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754280271)
 passed for `a025a112519994670af8f48d848e408ec9dfa492`: 63 Rust unit tests,
@@ -15,8 +15,13 @@ cooperative exit, successful update, payload/notices/synthetic data preservation
 and real GUI startup and normal close. Source, version and hashes match in all
 three receipts. This does not prove every historical or custom-path upgrade.
 
-Publication remains pending paired Hub verification. See the
-[alpha.6 release notes](RELEASE-0.3.0-alpha.6.md) for current scope and limitations.
+The [fresh prerequisite run](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754298548)
+and [paired Hub staged native matrix](https://github.com/BOBWORKS-XR/CREATOR-HUB/actions/runs/34754847040)
+also passed. Setup is published as a prerelease, not stable. Its 11 public files
+were anonymously downloaded and compared to the accepted stage; descriptor,
+installer, actual installed-EXE and tamper-rejection verification passed.
+Hub records its separate public-feed retest with its release. See the
+[alpha.6 release notes](RELEASE-0.3.0-alpha.6.md) for scope and limitations.
 
 ## Alpha.1 Historical Evidence
 

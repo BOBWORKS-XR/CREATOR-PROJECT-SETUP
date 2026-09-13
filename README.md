@@ -9,9 +9,9 @@ packaging support. Windows is the first physically tested platform; macOS and
 Linux packages remain preview quality until their full Unity workflows have
 been exercised on real machines.
 
-## Windows Prerelease Preparation: 0.3.0-alpha.6
+## Windows Prerelease: 0.3.0-alpha.6
 
-The next coordinated Windows prerelease adds **Set up and create project**:
+This Windows prerelease adds **Set up and create project**:
 install missing approved Unity requirements, then create and validate a Creator
 SDK project from one starting action. Unity sign-in, licences and Windows
 administrator approvals still need your input.
@@ -29,9 +29,19 @@ The matching hosted version is **Creator Hub 0.1.0-alpha.6**; standalone Setup
 does not require Hub. **Creator Works MCP 2.7.0-alpha.1** remains unchanged and
 does not require Project Setup. Update Hub first for the new hosted Setup view.
 
-Publication is pending final clean CI builds, installed-upgrade checks and paired
-Hub verification. See [alpha.6 release notes](docs/RELEASE-0.3.0-alpha.6.md) for
-the test scope and known limitations. Earlier public downloads below are unchanged.
+**[Download Project Setup 0.3.0-alpha.6](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.3.0-alpha.6)**
+as a Windows installer or portable ZIP. Keep the included `licenses` folder.
+Close Setup normally before upgrading. Windows binaries remain unsigned for
+publisher/SmartScreen purposes; signed Hub metadata is a separate check.
+
+Clean CI passed 63 Rust unit tests, two executable-identity tests and 57 UI tests.
+Actual upgrades from stable 0.2.2, alpha.1 and alpha.2 passed, as did the fresh
+Windows prerequisite installation/reuse/JDK-repair test. The paired Hub staged
+native matrix passed clean, older-app and MCP-only routes. See the
+[alpha.6 release notes](docs/RELEASE-0.3.0-alpha.6.md) for exact runs, hashes and
+limits. Fresh-user sign-in-to-project acceptance, abnormal hosted disconnect
+cleanup and native macOS/Linux installation remain separate. Stable and earlier
+prerelease assets are unchanged.
 
 ## Previous Windows Prerelease: 0.3.0-alpha.2
 
@@ -122,20 +132,16 @@ both the declared and observed values instead of hiding that discrepancy.
 
 ## Prerequisite Installation
 
-**Published 0.3.0-alpha.2 detects missing prerequisites; it does not install them.** This includes
-the pinned Unity Editor, Android tools and Windows build support. If the Editor
-is absent, several requirements show as missing together; the current action
-only opens Unity Hub. Setup installs the Creator SDK into a new project after
-the Unity requirements are present. Guided prerequisite installation is the
-[next priority](docs/PLAN.md#next-priority---prerequisite-installation-candidate),
-not a feature of the published diagnostics hotfix.
+Alpha.6 can install missing Windows prerequisites after approval. It rechecks
+actual files and an active licence before creating a project. An old Hub is not
+silently upgraded, and unrelated Editors are not overwritten. The earlier
+alpha.2 diagnostics release only detected requirements; use alpha.6 for this flow.
 
-The alpha.6 candidate combines the prerequisite installer with download metrics,
-native Requirements refresh and the Hub menu correction. See the
-[development and test history](docs/PREREQUISITE-CANDIDATE.md). Earlier
-[disposable-Windows installation checks](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34602021240)
-and separate licensed-PC project tests passed; these are not proof of the combined
-fresh-user sign-in-to-finished-project flow. That remains a user-testing boundary.
+The [fresh Windows test](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754298548)
+covered real installation, reuse, isolated JDK repair and an activation handoff
+without a Unity account. Separate licensed-PC project tests covered creation
+and validation; the combined fresh-user sign-in-to-finished-project flow remains
+a user-testing boundary. See the [development history](docs/PREREQUISITE-CANDIDATE.md).
 
 ## Project Workflows
 

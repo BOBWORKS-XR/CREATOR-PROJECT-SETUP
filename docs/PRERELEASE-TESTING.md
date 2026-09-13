@@ -4,8 +4,8 @@ Use the prerelease assets from the three repositories, not old stable installers
 or a random local development build. Each release must identify its tested source,
 installer hashes, checksums and remaining limits. The suite is not yet a stable release.
 
-The next coordinated pair is being prepared: Creator Hub 0.1.0-alpha.6 and
-Project Setup 0.3.0-alpha.6. Once those prereleases are published, start with
+The coordinated pair is Creator Hub 0.1.0-alpha.6 and
+Project Setup 0.3.0-alpha.6. Start with
 [Creator Hub 0.1.0-alpha.6](https://github.com/BOBWORKS-XR/CREATOR-HUB/releases/tag/v0.1.0-alpha.6).
 It can install the matching
 [Project Setup 0.3.0-alpha.6](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.3.0-alpha.6)
