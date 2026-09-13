@@ -1,6 +1,70 @@
 # Windows Prerequisite Installation Candidate
 
-Status: unreleased `0.3.0-alpha.3`, branch `feat/prerequisite-setup`.
+Status: unreleased `0.3.0-alpha.6`, branch `feat/prerequisite-setup`.
+
+## Alpha.6 Matched-Candidate Checkpoint
+
+Alpha.6 includes the alpha.5 requirements refresh and alpha.4 download metrics,
+plus the Creator Hub menu correction: it opens Hub releases, not the historical
+planning document. Existing candidate ZIPs are unchanged. This is a local test
+build, not a public release. Paired Hub hosting requires verification of the
+exact new executable and separate native acceptance; packaging alone is not
+proof of installation, upgrade, or fresh-machine success.
+
+## Alpha.5 Requirements Display
+
+Alpha.3 and alpha.4 retained the initial requirements list until the complete
+project-creation operation ended. This could show Unity as Missing while the
+newly installed Editor was already importing the project.
+
+Alpha.5 includes the native installation-check snapshot in the first project
+progress event. The requirements rows, old blocker and Hub action update before
+import finishes. Both standalone and hosted views consume the same event; no
+extra refresh request is queued behind hosted creation. Later import updates do
+not repeat the inventory, and project-written progress files cannot supply it.
+Incomplete checks remain incomplete: a download or a stage number alone never
+marks requirements installed. Project creation stays locked until completion.
+The download visibility from alpha.4 is retained. Prior candidate files and their
+acceptance evidence below are unchanged; this is not a released update.
+
+Local alpha.5 checks: 63 Rust tests, 2 executable metadata checks, 49 browser
+tests and 15 packaging/owned-process tests pass, with strict Clippy and formatting.
+The UI regression covers the reported Missing-to-Installed transition during
+import, cleared stale blockers, unchanged creation locks and no queued refresh
+command. Native serialization tests prevent project progress files from claiming
+installation checks. Real clean-machine and installed-upgrade acceptance of this
+new executable remain separate from these checks.
+
+## Alpha.4 Download Visibility
+
+Alpha.4 adds current-file bytes, total file size and transfer speed to the
+prerequisite progress panel. The full Editor/tools download size is separate.
+Existing alpha.3 binaries and their acceptance evidence below are unchanged.
+
+- Hub download bytes come from Setup's existing HTTP stream.
+- Unity Editor/module rates are estimates from recent installer-file growth in
+  the configured download cache, polled once a second. File handles are closed
+  immediately; no installer files are read, modified or locked against writes.
+- Observation is restricted to names and sizes from the pinned Windows x64
+  release, also checked against the approved CLI preview. Unknown, ambiguous,
+  inaccessible or already-complete files show size/rate as unavailable.
+- CLI grouped percentages are not treated as current-file percentages or bytes.
+  Installer phases remain indeterminate. Speed resets between components and
+  retries; missing updates clear the last displayed rate.
+- Rates describe observed transfer/file growth, not Internet connection capacity.
+  This improves visibility, not download speed. Actual beta.9 telemetry on the
+  second PC still needs verification; local tests are not that acceptance.
+
+Reference: [pinned Unity release manifest](https://services.api.unity.com/unity/editor/release/v1/releases?version=6000.3.21f1).
+No dependency, download URL, verification, approval, install argument or licence
+handling changes are part of this display update. No automatic log upload.
+
+Local alpha.4 checks: 62 Rust tests, 2 executable metadata checks, 47 browser
+tests and 15 packaging/owned-process tests pass. Strict Clippy and formatting
+checks pass. A real PowerShell child writes a fixture with exclusive sharing;
+size and nonzero rate update while its CLI percentage stays unchanged. Ordinary
+data reads failed this test; metadata-only handles pass without opening the
+installer contents. This fixture does not download or install Unity.
 Published `0.3.0-alpha.2` does not install missing Unity requirements.
 
 ## Intended Flow

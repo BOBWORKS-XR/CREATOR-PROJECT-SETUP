@@ -52,8 +52,12 @@ const existingMode = document.querySelector('#existing-mode');
 const stages = ['Check requirements', 'Prepare project', 'Import and compile', 'Configure Visual Scripting', 'Reopen and validate', 'Add to Unity Hub', 'Project ready'];
 let currentStep = 0;
 
-function renderProgress({ step, detail }) {
+function renderProgress({ step, detail, environment: checkedEnvironment }) {
   if (!Number.isInteger(step) || step < currentStep || step < 1 || step > stages.length) return;
+  if (checkedEnvironment) {
+    renderEnvironment(checkedEnvironment);
+    updateControls();
+  }
   currentStep = step;
   document.querySelector('#stage-progress').value = step - 1;
   elements.activityTitle.textContent = stages[step - 1];
@@ -181,6 +185,32 @@ for (const button of document.querySelectorAll('[data-terms]')) button.addEventL
 elements.sdkSource.addEventListener('click', () => invoke('open_official_url', { url: 'https://greenfield-registry.sdq.st/-/web/detail/com.sidequest.creator-sdk' }).catch(showActionError));
 document.querySelector('#github-button').addEventListener('click', () => invoke('open_official_url', { url: 'https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP' }).catch(showActionError));
 
+function formatBytes(bytes) {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let unit = 0;
+  while (bytes >= 1000 && unit < units.length - 1) { bytes /= 1000; unit++; }
+  return `${bytes.toFixed(unit ? 2 : 0)} ${units[unit]}`;
+}
+
+let transferUpdatedAt = null;
+function renderTransfer(transfer) {
+  transferUpdatedAt = transfer ? Date.now() : null;
+  const container = document.querySelector('#download-metrics');
+  container.classList.toggle('hidden', !transfer);
+  const validBytes = value => Number.isSafeInteger(value) && value >= 0;
+  const total = transfer && validBytes(transfer.totalBytes) && transfer.totalBytes > 0 ? transfer.totalBytes : null;
+  const downloaded = transfer && validBytes(transfer.downloadedBytes) && (total === null || transfer.downloadedBytes <= total) ? transfer.downloadedBytes : null;
+  const rate = transfer && typeof transfer.bytesPerSecond === 'number' && Number.isFinite(transfer.bytesPerSecond) && transfer.bytesPerSecond >= 0 ? transfer.bytesPerSecond : null;
+  document.querySelector('#download-size').textContent = !transfer ? '' : total !== null
+    ? downloaded !== null ? `${formatBytes(downloaded)} / ${formatBytes(total)}` : `File size: ${formatBytes(total)}`
+    : 'File size unavailable';
+  const speed = document.querySelector('#download-speed');
+  speed.textContent = !transfer ? '' : rate !== null && downloaded !== null ? `${transfer.estimated ? '~' : ''}${formatBytes(rate)}/s` : 'Speed unavailable';
+  speed.title = transfer?.estimated ? 'Estimated from installer file growth over recent samples.' : '';
+  const planned = transfer && validBytes(transfer.plannedBytes) && transfer.plannedBytes > 0 ? transfer.plannedBytes : null;
+  document.querySelector('#download-plan').textContent = planned !== null ? `Editor + tools: ${formatBytes(planned)}` : '';
+}
+
 elements.create.addEventListener('click', async () => {
   if (mode !== 'new' || busy || inspecting || checking || createdProject || !environment || (!environment.ready && environment.platform !== 'windows')) return;
   busy = true;
@@ -190,12 +220,19 @@ elements.create.addEventListener('click', async () => {
   elements.result.classList.add('hidden');
   elements.openProject.classList.add('hidden');
   elements.activity.classList.remove('hidden');
+  renderTransfer(null);
+  document.querySelector('#download-progress').classList.add('hidden');
+  document.querySelector('#stage-progress').classList.remove('hidden');
+  elements.progressSteps.classList.remove('hidden');
   currentStep = 0;
   renderProgress({ step: 1, detail: 'Checking project path and Unity requirements.' });
   const started = Date.now();
   const updateElapsed = () => {
     const seconds = Math.floor((Date.now() - started) / 1000);
     elements.elapsed.textContent = `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s elapsed`;
+    if (transferUpdatedAt !== null && Date.now() - transferUpdatedAt > 3000) {
+      document.querySelector('#download-speed').textContent = 'Waiting for download data';
+    }
   };
   updateElapsed();
   const timer = setInterval(updateElapsed, 1000);
@@ -210,10 +247,13 @@ elements.create.addEventListener('click', async () => {
       elements.progressSteps.classList.add('hidden');
       const download = document.querySelector('#download-progress');
       download.classList.remove('hidden');
+      download.setAttribute('aria-label', value.transfer ? 'Current file download' : 'Unity reported progress');
+      renderTransfer(value.transfer);
       if (typeof value.percent === 'number' && Number.isFinite(value.percent) && value.percent >= 0 && value.percent <= 100) download.value = value.percent;
       else download.removeAttribute('value');
     });
     unlisten = await window.CreatorRuntime.listen('setup-progress', event => {
+      renderTransfer(null);
       document.querySelector('#download-progress').classList.add('hidden');
       document.querySelector('#stage-progress').classList.remove('hidden');
       elements.progressSteps.classList.remove('hidden');
@@ -236,6 +276,7 @@ elements.create.addEventListener('click', async () => {
     clearInterval(timer);
     if (unlisten) unlisten();
     if (unlistenRequirements) unlistenRequirements();
+    renderTransfer(null);
     try { renderEnvironment(await invoke('probe_environment')); } catch { /* Retain the failure and last known requirements. */ }
     busy = false;
     creating = false;

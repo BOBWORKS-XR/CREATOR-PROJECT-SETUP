@@ -48,7 +48,10 @@ macOS/Linux acceptance. Backups are selective; failure recovery is manual.
 
 ## Next Priority - Prerequisite Installation Candidate
 
-An isolated Windows-first alpha.3 implementation is under validation. See the
+An isolated Windows-first alpha.6 implementation is under validation. Alpha.3
+installation evidence is retained; alpha.4 adds download size/rate visibility,
+and alpha.5 refreshes the installed requirements before project import. Alpha.6
+adds the Hub menu correction and a matched-candidate test checkpoint. See the
 [candidate flow and release gates](PREREQUISITE-CANDIDATE.md). The historical gap
 below still describes published alpha.2; do not treat the candidate as released.
 

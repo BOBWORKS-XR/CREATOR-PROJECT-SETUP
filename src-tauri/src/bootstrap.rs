@@ -26,6 +26,7 @@ pub struct Progress {
     pub stage: String,
     pub detail: String,
     pub percent: Option<f64>,
+    pub transfer: Option<crate::download_progress::Transfer>,
 }
 
 fn progress(stage: &str, detail: impl Into<String>) -> Progress {
@@ -33,6 +34,7 @@ fn progress(stage: &str, detail: impl Into<String>) -> Progress {
         stage: stage.into(),
         detail: detail.into(),
         percent: None,
+        transfer: None,
     }
 }
 
@@ -392,6 +394,7 @@ fn frame_progress(frame: &Value) -> Option<Progress> {
         .into(),
         detail: name,
         percent,
+        transfer: None,
     })
 }
 
@@ -465,6 +468,18 @@ fn run_cli(
     preview: bool,
     emit: &impl Fn(Progress),
 ) -> Result<Value, String> {
+    run_cli_tracked(helper, args, label, logs, preview, emit, None)
+}
+
+fn run_cli_tracked(
+    helper: &Path,
+    args: &[String],
+    label: &str,
+    logs: &Path,
+    preview: bool,
+    emit: &impl Fn(Progress),
+    mut downloads: Option<crate::download_progress::CliDownloads>,
+) -> Result<Value, String> {
     let stdout =
         File::create(logs.join(format!("{label}.stdout.log"))).map_err(|e| e.to_string())?;
     let stderr =
@@ -515,6 +530,14 @@ fn run_cli(
                 break child.wait().map_err(|e| e.to_string())?;
             }
             if let Ok(event) = receiver.recv_timeout(Duration::from_millis(200)) {
+                let event = if let Some(downloads) = &mut downloads {
+                    downloads.event(event)
+                } else {
+                    event
+                };
+                emit(event);
+            }
+            if let Some(event) = downloads.as_mut().and_then(|downloads| downloads.poll()) {
                 emit(event);
             }
         };
@@ -525,6 +548,11 @@ fn run_cli(
             .join()
             .map_err(|_| "Unity error reader stopped.")??;
         for event in receiver.try_iter() {
+            let event = if let Some(downloads) = &mut downloads {
+                downloads.event(event)
+            } else {
+                event
+            };
             emit(event);
         }
         if timed_out {
@@ -737,21 +765,26 @@ fn ensure_inner(
         if action == Action::InstallEditor && editor_root.exists() {
             return Err("The target Editor directory already exists but is not a verified registered installation. Setup will not overwrite it. Review the partial/manual installation in Unity Hub.".into());
         }
-        let download_bytes = if action == Action::None {
-            0
+        let preview = if action == Action::None {
+            Value::Null
         } else {
             emit(progress(
                 "Planning Unity installation",
                 "Checking download sizes without installing anything.",
             ));
-            preview_size(&run_cli(
+            run_cli(
                 &helper,
                 &arguments(&action, &modules, true),
                 "preview",
                 &logs,
                 true,
                 &emit,
-            )?)?
+            )?
+        };
+        let download_bytes = if action == Action::None {
+            0
+        } else {
+            preview_size(&preview)?
         };
         let plan = Plan {
             action,
@@ -806,13 +839,18 @@ fn ensure_inner(
                 require_editor_closed(Path::new(&editor.executable))?;
             }
             emit(progress("Installing Unity requirements", "Unity is downloading and installing the approved components. Administrator prompts may appear."));
-            run_cli(
+            run_cli_tracked(
                 &helper,
                 &arguments(&plan.action, &plan.modules, false),
                 "install-editor",
                 &logs,
                 false,
                 &emit,
+                Some(crate::download_progress::CliDownloads::new(
+                    plan.cache_root.clone(),
+                    &preview,
+                    plan.download_bytes,
+                )),
             )?;
         }
         emit(progress(
@@ -939,6 +977,56 @@ mod tests {
         assert_eq!(events[0].percent, Some(42.0));
         assert_eq!(events[0].detail, "Downloading Android Build Support...");
         assert_eq!(events[1].percent, None);
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn child_download_growth_emits_metrics_even_when_cli_percent_is_unchanged() {
+        let temp = tempfile::tempdir().unwrap();
+        let cache = temp.path().join("cache");
+        fs::create_dir(&cache).unwrap();
+        let helper = PathBuf::from(std::env::var_os("SystemRoot").unwrap())
+            .join("System32/WindowsPowerShell/v1.0/powershell.exe");
+        let fixture =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/prerequisite-cli.ps1");
+        let preview = parse_report(
+            include_bytes!("../tests/fixtures/cli-install-preview.txt"),
+            "preview",
+        )
+        .unwrap();
+        let output = cache.join(
+            "jdk17.0.18-8_15e8817d1f5db6db3571ebe7430ef37f7fa8e60e8ff6f3e18ca1cb4c29f78774.zip",
+        );
+        let events = Mutex::new(Vec::new());
+        run_cli_tracked(
+            &helper,
+            &[
+                "-NoProfile".into(),
+                "-NonInteractive".into(),
+                "-File".into(),
+                fixture.to_string_lossy().into(),
+                "stream-progress".into(),
+                output.to_string_lossy().into(),
+            ],
+            "fixture-stream",
+            temp.path(),
+            false,
+            &|p| events.lock().unwrap().push(p),
+            Some(crate::download_progress::CliDownloads::new(
+                cache,
+                &preview,
+                preview_size(&preview).unwrap(),
+            )),
+        )
+        .unwrap();
+        let events = events.lock().unwrap();
+        assert!(events.iter().filter_map(|p| p.transfer.as_ref()).any(|t| t
+            .downloaded_bytes
+            .is_some_and(|b| b > 0 && b < 118110508)
+            && t.bytes_per_second.is_some_and(|r| r > 0.0 && r.is_finite())));
+        assert!(events.last().unwrap().transfer.is_none());
+        assert!(events.iter().all(|p| p.percent != Some(8.0)));
+        assert_eq!(fs::metadata(output).unwrap().len(), 20 * 65536);
     }
 
     #[test]

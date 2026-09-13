@@ -5,7 +5,7 @@
   const dismiss = document.querySelector('#suite-dismiss');
   const error = document.querySelector('#suite-error');
   const links = Object.freeze({
-    hub: 'https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/blob/master/docs/CREATOR-HUB-PLAN.md',
+    hub: 'https://github.com/BOBWORKS-XR/CREATOR-HUB/releases',
     mcp: 'https://github.com/BOBWORKS-XR/CREATOR-WORKS-UNITY-MCP/releases',
   });
   const items = () => [...menu.querySelectorAll('button:not(:disabled)')];

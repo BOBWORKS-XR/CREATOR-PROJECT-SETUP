@@ -78,6 +78,9 @@ input[type="text"]:focus { border-color: var(--cyan); box-shadow: 0 0 0 2px #00c
 #stage-progress::-webkit-progress-bar { background: var(--line); }
 #stage-progress::-webkit-progress-value { background: var(--cyan); }
 #stage-progress::-moz-progress-bar { background: var(--cyan); }
+#download-progress { display: block; width: 100%; height: 5px; margin: 12px 0 8px; accent-color: var(--cyan); }
+.download-metrics { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin-bottom: 6px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.download-plan { flex-basis: 100%; color: var(--muted); font-size: 11px; }
 .progress-steps { padding-left: 20px; color: var(--muted); margin: 10px 0; }
 .progress-steps li { padding: 2px 0; }
 .progress-steps .done { color: var(--green); }

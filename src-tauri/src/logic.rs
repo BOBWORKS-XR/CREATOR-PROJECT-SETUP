@@ -55,7 +55,7 @@ pub(crate) const REQUIRED_BUILTIN_MODULES: &[&str] = &[
     "com.unity.modules.xr",
 ];
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Recipe {
     pub editor_version: String,
@@ -67,7 +67,7 @@ pub struct Recipe {
     pub registry_url: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct EditorInstallation {
     pub version: String,
@@ -83,7 +83,7 @@ pub struct EditorInstallation {
     pub ready: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvironmentReport {
     pub platform: String,
@@ -122,6 +122,9 @@ pub struct CreationResult {
 pub struct SetupProgress {
     pub step: u8,
     pub detail: String,
+    // Only native inspection may supply this, never the project's progress file.
+    #[serde(skip_deserializing, skip_serializing_if = "Option::is_none")]
+    pub environment: Option<EnvironmentReport>,
 }
 
 impl SetupProgress {
@@ -129,6 +132,15 @@ impl SetupProgress {
         Self {
             step,
             detail: detail.into(),
+            environment: None,
+        }
+    }
+
+    fn requirements_checked(environment: EnvironmentReport) -> Self {
+        Self {
+            step: 1,
+            detail: "Checked installed Unity and required modules.".into(),
+            environment: Some(environment),
         }
     }
 }
@@ -778,13 +790,12 @@ pub fn create_project(
     request: CreateRequest,
     progress: impl Fn(SetupProgress),
 ) -> Result<CreationResult, String> {
-    progress(SetupProgress::new(
-        1,
-        "Checking project path and required Unity modules.",
-    ));
     let target = creation_target(&request)?;
     let project_name = request.project_name.trim();
     let environment = probe_environment();
+    // The first project event also reaches Hub while create_project is running;
+    // a separate probe command would queue behind it in the hosted transport.
+    progress(SetupProgress::requirements_checked(environment.clone()));
     if !environment.ready {
         return Err(format!(
             "This computer is not ready: {}",
@@ -1203,6 +1214,43 @@ mod tests {
         ));
         assert!(script.contains("result.creatorNodeCount > 0"));
         assert!(script.contains("EditorApplication.delayCall += FinishConfiguration"));
+    }
+
+    #[test]
+    fn requirements_snapshot_is_native_only_and_preserves_failed_checks() {
+        let report = EnvironmentReport {
+            platform: "windows".into(),
+            hub_installed: true,
+            hub_path: None,
+            hub_version: Some("3.13.0".into()),
+            hub_auto_registration: false,
+            unity_cli_installed: true,
+            unity_cli_path: None,
+            recipe: recipe(),
+            editors: vec![],
+            ready: false,
+            blockers: vec!["Unity Editor is not installed.".into()],
+            suggested_project_parent: None,
+        };
+        let event = SetupProgress::requirements_checked(report.clone());
+        assert_eq!(event.step, 1);
+        assert_eq!(event.environment, Some(report));
+        let serialized = serde_json::to_value(&event).unwrap();
+        assert_eq!(serialized["environment"]["ready"], false);
+        assert_eq!(
+            serialized["environment"]["blockers"][0],
+            "Unity Editor is not installed."
+        );
+        let from_project: SetupProgress = serde_json::from_value(serialized).unwrap();
+        assert!(
+            from_project.environment.is_none(),
+            "Project progress files cannot supply installation evidence"
+        );
+        let ordinary = serde_json::to_value(SetupProgress::new(3, "Importing")).unwrap();
+        assert!(
+            ordinary.get("environment").is_none(),
+            "Do not repeat the installation inventory on import updates"
+        );
     }
 
     #[test]

@@ -113,6 +113,23 @@ licence-handoff check [passed](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SE
 Fresh-user sign-in and project creation after that installation still need
 real-PC acceptance; this is not yet a released feature.
 
+The separate unreleased **alpha.4** candidate adds file size, downloaded bytes and
+estimated Unity download speed. It measures installer-file growth rather than
+converting Unity's grouped percentage into bytes. Hub transfer uses its HTTP byte
+count. Unavailable measurements and quiet transfers are shown honestly; this is
+download visibility, not a speed improvement. See the
+[candidate notes](docs/PREREQUISITE-CANDIDATE.md#alpha4-download-visibility).
+
+The unreleased **alpha.5** follow-up retains that visibility and updates the
+requirements panel from the native checks when project creation begins. It no
+longer retains the startup "Missing" label throughout import and compilation.
+Download completion alone is not treated as proof of an installed Editor.
+
+The local **alpha.6** checkpoint includes both improvements and replaces the
+old Hub planning-document menu link with the Creator Hub releases page. Matched
+Hub hosting and a second-PC run are separate acceptance checks; this candidate
+does not change the public downloads above.
+
 - Detect Unity Hub, Unity CLI, compatible Editors, and required build modules.
 - Create a new project from the matching Editor's official 3D URP template.
 - Add the official Greenfield scoped registry and pinned Creator SDK package.

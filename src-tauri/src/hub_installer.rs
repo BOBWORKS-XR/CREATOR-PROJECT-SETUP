@@ -137,6 +137,9 @@ pub fn install(logs: &Path, emit: &impl Fn(Progress)) -> Result<(), String> {
             let mut digest = Sha256::new();
             let mut bytes = 0u64;
             let mut last = Instant::now();
+            let started = Instant::now();
+            let mut rate = crate::download_progress::Rate::default();
+            rate.sample(Duration::ZERO, 0);
             let mut buffer = [0u8; 64 * 1024];
             loop {
                 let count = response.read(&mut buffer).map_err(|e| e.to_string())?;
@@ -155,6 +158,12 @@ pub fn install(logs: &Path, emit: &impl Fn(Progress)) -> Result<(), String> {
                         stage: "Downloading Unity Hub".into(),
                         detail: format!("Unity Hub {VERSION}"),
                         percent: Some(bytes as f64 * 100.0 / SIZE as f64),
+                        transfer: Some(crate::download_progress::Transfer {
+                            downloaded_bytes: Some(bytes),
+                            total_bytes: Some(SIZE),
+                            bytes_per_second: rate.sample(started.elapsed(), bytes),
+                            ..Default::default()
+                        }),
                     });
                     last = Instant::now();
                 }
@@ -191,6 +200,7 @@ pub fn install(logs: &Path, emit: &impl Fn(Progress)) -> Result<(), String> {
         stage: "Installing Unity Hub".into(),
         detail: "Approve the Windows administrator prompt if requested.".into(),
         percent: None,
+        transfer: None,
     });
     let status = powershell(&path, INSTALL)?
         .stdout(File::create(logs.join("install-hub.stdout.log")).map_err(|e| e.to_string())?)

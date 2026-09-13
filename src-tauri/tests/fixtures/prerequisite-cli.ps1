@@ -17,6 +17,16 @@ switch ($mode) {
         [Console]::Out.WriteLine('{"type":"progress","phase":"install","name":"Android","pct":50}')
         [Console]::Out.WriteLine('{"type":"result","success":true}')
     }
+    'stream-progress' {
+        $file = [IO.File]::Open($args[1], [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        try {
+            [Console]::Out.WriteLine('{"type":"progress","phase":"download","msg":"Downloading OpenJDK...","pct":8}')
+            $buffer = New-Object byte[] 65536
+            for ($i = 0; $i -lt 20; $i++) { $file.Write($buffer, 0, $buffer.Length); Start-Sleep -Milliseconds 250 }
+        } finally { $file.Dispose() }
+        [Console]::Out.WriteLine('{"type":"progress","phase":"install","name":"OpenJDK","pct":8}')
+        [Console]::Out.WriteLine('{"type":"result","success":true}')
+    }
     default { exit 2 }
 }
 exit 0

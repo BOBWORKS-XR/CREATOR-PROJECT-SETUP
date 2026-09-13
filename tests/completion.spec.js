@@ -32,6 +32,91 @@ test('requirements progress switches to project progress and does not fake insta
   await expect(page.locator('#open-project-button')).toBeEnabled();
 });
 
+test('native requirements snapshot replaces stale missing state before import finishes', async ({ page }, testInfo) => {
+  await setup(page, { missingUnity: true, legacyHub: true, pending: true });
+  const unity = page.locator('.requirement').filter({ hasText: 'Unity 6000.3.21f1' });
+  await page.locator('#create-button').click();
+  await page.evaluate(() => window.eventCallbacks['requirements-progress']({ payload: {
+    stage: 'Installing requirements', detail: 'Installing Unity...', percent: 100,
+  } }));
+  await expect(unity).toContainText('Missing');
+  // Model a fresh native probe, then deliver it in the first project event.
+  await page.evaluate(async () => {
+    window.options.missingUnity = false;
+    window.checkedEnvironment = await window.__TAURI__.core.invoke('probe_environment');
+  });
+  const probes = await page.evaluate(() => window.calls.filter(call => call.command === 'probe_environment').length);
+  await page.evaluate(() => {
+    window.progressCallback({ payload: { step: 1, detail: 'Checked installed Unity and required modules.', environment: window.checkedEnvironment } });
+    window.progressCallback({ payload: { step: 3, detail: 'Importing Packages/com.unity.render-pipelines.core/Runtime/Example.fbx' } });
+  });
+  await expect(unity).toContainText('Installed');
+  await expect(page.locator('#requirements .requirement.bad')).toHaveCount(0);
+  await expect(page.locator('#requirements')).toContainText('Official 3D URP template');
+  await expect(page.locator('#requirements')).not.toContainText('Will install:');
+  await expect(page.locator('#blockers')).toBeHidden();
+  await expect(page.locator('#hub-button')).toBeHidden();
+  await expect(page.locator('#activity-title')).toHaveText('Import and compile');
+  await expect(page.locator('#overall-status')).toHaveText('Creating project');
+  await expect(page.locator('#create-button')).toBeDisabled();
+  await expect(page.locator('#refresh-button')).toBeDisabled();
+  await expect(page.locator('#open-project-button')).toBeHidden();
+  expect(await page.evaluate(() => window.calls.filter(call => call.command === 'probe_environment').length)).toBe(probes);
+  await page.screenshot({ path: testInfo.outputPath('installed-requirements-during-import.png'), fullPage: true });
+  await page.evaluate(() => window.finishCreate());
+  await expect(page.locator('#open-project-button')).toBeEnabled();
+});
+
+test('project progress alone cannot invent installed requirements or erase real blockers', async ({ page }) => {
+  await setup(page, { missingUnity: true, pending: true });
+  await page.locator('#create-button').click();
+  await page.evaluate(() => window.progressCallback({ payload: { step: 2, detail: 'Preparing project' } }));
+  await expect(page.locator('#blockers')).toContainText('not installed');
+  await page.evaluate(async () => {
+    const report = await window.__TAURI__.core.invoke('probe_environment');
+    window.progressCallback({ payload: { step: 3, detail: 'Checking', environment: report } });
+  });
+  await expect(page.locator('.requirement').filter({ hasText: 'Unity 6000.3.21f1' })).toContainText('Missing');
+  await expect(page.locator('#blockers')).toBeVisible();
+  await page.evaluate(() => { window.options.createError = 'Requirements not ready'; window.finishCreate(); });
+  await expect(page.locator('#result')).toContainText('Requirements not ready');
+});
+
+for (const scenario of [
+  { name: 'already detected Hub', missingHub: false, legacyHub: false },
+  { name: 'Hub installed during setup', missingHub: true, legacyHub: false },
+  { name: 'older installed Hub', missingHub: false, legacyHub: true },
+]) {
+  test(`completion refresh retains a detected Unity Hub: ${scenario.name}`, async ({ page }, testInfo) => {
+    await setup(page, { ...scenario, pending: true });
+    const hub = page.locator('#requirements .requirement').filter({ hasText: 'Unity Hub or Unity CLI' });
+    const probes = await page.evaluate(() => window.calls.filter(call => call.command === 'probe_environment').length);
+    await page.locator('#create-button').click();
+    await page.evaluate(() => {
+      window.options.missingHub = false;
+      window.progressCallback({ payload: { step: 7, detail: 'Project ready.' } });
+      window.finishCreate();
+    });
+    await expect(page.locator('#open-project-button')).toBeEnabled();
+    await expect(page.locator('#activity')).toBeHidden();
+    await expect(page.locator('#result.success')).toBeVisible();
+    await expect(hub).toContainText(scenario.legacyHub ? 'Hub 3.14.4' : 'Hub 3.21.1');
+    await expect(hub).not.toHaveClass(/bad/);
+    await expect(hub).not.toContainText('Missing');
+    expect(await page.evaluate(() => window.calls.filter(call => call.command === 'probe_environment').length)).toBe(probes + 1);
+    await page.screenshot({ path: testInfo.outputPath('post-creation-hub-detected.png'), fullPage: true });
+  });
+}
+
+test('failed final probe retains the last checked Hub status after successful creation', async ({ page }) => {
+  await setup(page, { pending: true });
+  await page.locator('#create-button').click();
+  await page.evaluate(() => { window.options.probeError = 'Environment check temporarily unavailable.'; window.finishCreate(); });
+  await expect(page.locator('#open-project-button')).toBeEnabled();
+  await expect(page.locator('#result.success')).toBeVisible();
+  await expect(page.locator('#requirements .requirement').filter({ hasText: 'Unity Hub or Unity CLI' })).toContainText('Hub 3.21.1');
+});
+
 for (const width of [390, 560]) {
   test(`fresh-PC installation controls fit at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 760 });
@@ -49,6 +134,88 @@ for (const width of [390, 560]) {
     await page.screenshot({ path: testInfo.outputPath('fresh-pc-small.png'), fullPage: true });
   });
 }
+
+for (const width of [390, 980]) {
+  test(`download bytes and measured speed fit at ${width}px and clear on transitions`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 760 });
+    await setup(page, { missingUnity: true, legacyHub: true, pending: true });
+    await page.locator('#create-button').click();
+    await page.evaluate(() => window.eventCallbacks['requirements-progress']({ payload: {
+      stage: 'Downloading requirements', detail: 'Downloading 6000.3.21f1-x86_64...', percent: 30,
+      transfer: { totalBytes: 4092408560, downloadedBytes: 1227722568, bytesPerSecond: 12400000, plannedBytes: 6954591148, estimated: true },
+    } }));
+    await expect(page.locator('#download-size')).toHaveText('1.23 GB / 4.09 GB');
+    await expect(page.locator('#download-speed')).toHaveText('~12.40 MB/s');
+    await expect(page.locator('#download-plan')).toHaveText('Editor + tools: 6.95 GB');
+    await expect(page.locator('#download-progress')).toHaveAttribute('aria-label', 'Current file download');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    const layout = await page.locator('#download-metrics').evaluate(node => {
+      const outer = node.getBoundingClientRect();
+      return [...node.children].every(child => { const rect = child.getBoundingClientRect(); return rect.left >= outer.left && rect.right <= outer.right; });
+    });
+    expect(layout).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath('download-metrics.png'), fullPage: true });
+    await page.evaluate(() => window.eventCallbacks['requirements-progress']({ payload: {
+      stage: 'Downloading requirements', detail: 'Downloading OpenJDK...', percent: null,
+      transfer: { totalBytes: 118110508, downloadedBytes: null, bytesPerSecond: null, estimated: true },
+    } }));
+    await expect(page.locator('#download-size')).toHaveText('File size: 118.11 MB');
+    await expect(page.locator('#download-speed')).toHaveText('Speed unavailable');
+    await expect(page.locator('#download-plan')).toBeEmpty();
+    await page.evaluate(() => window.eventCallbacks['requirements-progress']({ payload: { stage: 'Installing requirements', detail: 'Installing OpenJDK...', percent: null } }));
+    await expect(page.locator('#download-metrics')).toBeHidden();
+    await expect(page.locator('#download-speed')).toBeEmpty();
+    await page.evaluate(() => window.progressCallback({ payload: { step: 3, detail: 'Unity is compiling.' } }));
+    await expect(page.locator('#download-metrics')).toBeHidden();
+    await page.evaluate(() => window.finishCreate());
+    await expect(page.locator('#open-project-button')).toBeEnabled();
+  });
+}
+
+test('download metrics reject invalid numbers and preserve a genuine zero speed', async ({ page }) => {
+  await setup(page, { missingUnity: true, pending: true });
+  await page.locator('#create-button').click();
+  for (const transfer of [
+    { totalBytes: -1, downloadedBytes: -1, bytesPerSecond: -1 },
+    { totalBytes: 100, downloadedBytes: 101, bytesPerSecond: Infinity },
+    { totalBytes: '100', downloadedBytes: '50', bytesPerSecond: '25' },
+    { totalBytes: NaN, downloadedBytes: NaN, bytesPerSecond: NaN },
+  ]) {
+    await page.evaluate(transfer => window.eventCallbacks['requirements-progress']({ payload: { stage: 'Downloading requirements', detail: 'Downloading...', transfer } }), transfer);
+    await expect(page.locator('#download-speed')).toHaveText('Speed unavailable');
+    await expect(page.locator('#download-size')).not.toContainText('NaN');
+  }
+  await page.evaluate(() => window.eventCallbacks['requirements-progress']({ payload: {
+    stage: 'Downloading requirements', detail: 'Downloading...', transfer: { totalBytes: 10000, downloadedBytes: 4000, bytesPerSecond: 0 },
+  } }));
+  await expect(page.locator('#download-speed')).toHaveText('0 B/s');
+  await page.evaluate(() => { window.options.createError = 'Download failed'; window.finishCreate(); });
+  await expect(page.locator('#download-metrics')).toBeHidden();
+  await expect(page.locator('#result')).toContainText('Download failed');
+  await page.locator('#create-button').click();
+  await expect(page.locator('#download-metrics')).toBeHidden();
+  await expect(page.locator('#download-progress')).toBeHidden();
+  await expect(page.locator('#stage-progress')).toBeVisible();
+  await page.evaluate(() => window.finishCreate());
+});
+
+test('a quiet download does not leave a stale speed on screen', async ({ page }) => {
+  await setup(page, { missingUnity: true, pending: true });
+  await page.clock.install();
+  await page.locator('#create-button').click();
+  const report = () => window.eventCallbacks['requirements-progress']({ payload: {
+    stage: 'Downloading Unity Hub', detail: 'Unity Hub 3.21.1', percent: 50,
+    transfer: { totalBytes: 182869104, downloadedBytes: 91434552, bytesPerSecond: 1000000 },
+  } });
+  await page.evaluate(report);
+  await expect(page.locator('#download-speed')).toHaveText('1.00 MB/s');
+  await page.clock.fastForward(5000);
+  await expect(page.locator('#download-speed')).toHaveText('Waiting for download data');
+  await expect(page.locator('#download-size')).toHaveText('91.43 MB / 182.87 MB');
+  await page.evaluate(report);
+  await expect(page.locator('#download-speed')).toHaveText('1.00 MB/s');
+  await page.evaluate(() => window.finishCreate());
+});
 
 for (const message of ['Setup cancelled before installation.', 'Not enough free space. Nothing was installed.', 'Unity requirement installation failed. Recheck before retrying.']) {
   test(`prerequisite failure preserves inputs and permits a fresh check: ${message}`, async ({ page }) => {
@@ -92,6 +259,7 @@ async function setup(page, options = {}) {
       return () => { delete window.eventCallbacks[name]; if (name === 'setup-progress') window.progressCallback = null; };
     } }, core: { invoke: async (command, args) => {
       window.calls.push({ command, args });
+      if (command === 'probe_environment' && window.options.probeError) throw window.options.probeError;
       if (command === 'probe_environment') return {
         platform: window.options.platform || 'windows', ready: !window.options.missingUnity, hubInstalled: !window.options.missingHub, unityCliInstalled: false,
         hubVersion: window.options.legacyHub ? '3.14.4' : '3.21.1', hubAutoRegistration: !window.options.legacyHub,
@@ -426,6 +594,29 @@ test('creation replaces fields with a summary, without changing the request', as
   await expect(page.locator('#activity')).toBeHidden();
 });
 
+for (const width of [940, 720, 560, 390]) {
+  test(`maximum-length project summary stays within its pane at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 760 });
+    await setup(page, { pending: true });
+    await page.locator('#project-name').fill('W'.repeat(64));
+    await page.locator('#create-button').click();
+    await expect(page.locator('#summary-name')).toHaveText('W'.repeat(64));
+    const fits = await page.evaluate(() => {
+      const pane = document.querySelector('.setup-pane').getBoundingClientRect();
+      const heading = document.querySelector('#requirements-heading').getBoundingClientRect();
+      const range = document.createRange();
+      range.selectNodeContents(document.querySelector('#summary-name'));
+      return [...range.getClientRects()].every(rect => rect.left >= pane.left - 1 && rect.right <= pane.right + 1 &&
+        !(rect.left < heading.right && rect.right > heading.left && rect.top < heading.bottom && rect.bottom > heading.top)) &&
+        document.documentElement.scrollWidth <= innerWidth;
+    });
+    expect(fits).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath('long-project-summary.png'), fullPage: true });
+    await page.evaluate(() => window.finishCreate());
+    await expect(page.locator('#open-project-button')).toBeEnabled();
+  });
+}
+
 test('app switcher supports keyboard, outside dismissal and bounded links', async ({ page }) => {
   await setup(page);
   const trigger = page.locator('#suite-trigger');
@@ -433,6 +624,9 @@ test('app switcher supports keyboard, outside dismissal and bounded links', asyn
   await trigger.focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('[data-suite-link="hub"]')).toBeFocused();
+  await expect(page.locator('[data-suite-link="hub"]')).toContainText('Releases');
+  await page.keyboard.press('Enter');
+  expect(await page.evaluate(() => window.calls.at(-1))).toEqual({ command: 'open_official_url', args: { url: 'https://github.com/BOBWORKS-XR/CREATOR-HUB/releases' } });
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('[data-suite-link="mcp"]')).toBeFocused();
   await page.keyboard.press('Enter');
@@ -458,7 +652,7 @@ test('external link failures are visible and do not claim installation', async (
   await page.locator('#suite-trigger').click();
   await page.locator('[data-suite-link="hub"]').click();
   await expect(page.locator('#suite-error')).toContainText('Browser unavailable');
-  await expect(page.locator('[data-suite-link="hub"]')).toContainText('In development');
+  await expect(page.locator('[data-suite-link="hub"]')).toContainText('Releases');
   await page.keyboard.press('Escape');
   await expect(page.locator('#suite-trigger')).toBeFocused();
 });
