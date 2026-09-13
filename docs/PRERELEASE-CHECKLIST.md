@@ -20,7 +20,8 @@ and [paired Hub staged native matrix](https://github.com/BOBWORKS-XR/CREATOR-HUB
 also passed. Setup is published as a prerelease, not stable. Its 11 public files
 were anonymously downloaded and compared to the accepted stage; descriptor,
 installer, actual installed-EXE and tamper-rejection verification passed.
-Hub records its separate public-feed retest with its release. See the
+Hub's separate [public-feed retest](https://github.com/BOBWORKS-XR/CREATOR-HUB/actions/runs/34756015590)
+passed all three routes using the same installer without staging. See the
 [alpha.6 release notes](RELEASE-0.3.0-alpha.6.md) for scope and limitations.
 
 ## Alpha.1 Historical Evidence

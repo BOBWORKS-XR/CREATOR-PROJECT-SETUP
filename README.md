@@ -25,7 +25,7 @@ administrator approvals still need your input.
 - Detailed errors and versioned local logs/receipts, with no automatic uploads.
 - Corrected Creator Hub menu link to the Hub releases page.
 
-The matching hosted version is **Creator Hub 0.1.0-alpha.6**; standalone Setup
+The matching hosted version is [Creator Hub 0.1.0-alpha.6](https://github.com/BOBWORKS-XR/CREATOR-HUB/releases/tag/v0.1.0-alpha.6); standalone Setup
 does not require Hub. **Creator Works MCP 2.7.0-alpha.1** remains unchanged and
 does not require Project Setup. Update Hub first for the new hosted Setup view.
 
@@ -37,7 +37,9 @@ publisher/SmartScreen purposes; signed Hub metadata is a separate check.
 Clean CI passed 63 Rust unit tests, two executable-identity tests and 57 UI tests.
 Actual upgrades from stable 0.2.2, alpha.1 and alpha.2 passed, as did the fresh
 Windows prerequisite installation/reuse/JDK-repair test. The paired Hub staged
-native matrix passed clean, older-app and MCP-only routes. See the
+native matrix passed clean, older-app and MCP-only routes. A separate
+[public-feed retest](https://github.com/BOBWORKS-XR/CREATOR-HUB/actions/runs/34756015590)
+passed all three routes with the same Hub files. See the
 [alpha.6 release notes](docs/RELEASE-0.3.0-alpha.6.md) for exact runs, hashes and
 limits. Fresh-user sign-in-to-project acceptance, abnormal hosted disconnect
 cleanup and native macOS/Linux installation remain separate. Stable and earlier

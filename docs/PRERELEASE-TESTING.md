@@ -95,6 +95,16 @@ excerpt. A screenshot of the final message alone is not proof of successful setu
 
 ## What Automated Tests Do Not Establish
 
+For the current alpha.6 pair, [Setup candidate checks](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754280271),
+[three installed upgrades](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754654023),
+[fresh prerequisite installation/reuse/JDK repair](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754298548),
+and the [Hub public-feed native matrix](https://github.com/BOBWORKS-XR/CREATOR-HUB/actions/runs/34756015590)
+passed. The latter reused the exact staged-tested Hub binary without staging.
+It covers clean, older-app and MCP-only routes, not Unity creation or self-update.
+The prerequisite test used no Unity account and did not create a project.
+
+Earlier alpha.1 evidence below is retained as history, not relabelled as alpha.6.
+
 The [native Hub matrix](https://github.com/BOBWORKS-XR/CREATOR-HUB/actions/runs/34536443333)
 passed clean-install, older-app upgrade and MCP-only routes against unchanged
 release binaries. These are real Windows install/hosted-interface checks, including
