@@ -4,9 +4,11 @@ Use the prerelease assets from the three repositories, not old stable installers
 or a random local development build. Each release must identify its tested source,
 installer hashes, checksums and remaining limits. The suite is not yet a stable release.
 
-Start with [Creator Hub 0.1.0-alpha.3](https://github.com/BOBWORKS-XR/CREATOR-HUB/releases/tag/v0.1.0-alpha.3).
+The next coordinated pair is being prepared: Creator Hub 0.1.0-alpha.6 and
+Project Setup 0.3.0-alpha.6. Once those prereleases are published, start with
+[Creator Hub 0.1.0-alpha.6](https://github.com/BOBWORKS-XR/CREATOR-HUB/releases/tag/v0.1.0-alpha.6).
 It can install the matching
-[Project Setup 0.3.0-alpha.1](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.3.0-alpha.1)
+[Project Setup 0.3.0-alpha.6](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.3.0-alpha.6)
 and [Creator Works MCP 2.7.0-alpha.1](https://github.com/BOBWORKS-XR/CREATOR-WORKS-UNITY-MCP/releases/tag/v2.7.0-alpha.1)
 after approval. Both apps remain usable standalone. MCP does not depend on Setup;
 use the MCP-only route below when you already have a Unity project.
@@ -33,6 +35,11 @@ use the MCP-only route below when you already have a Unity project.
    registry entries. Hosting/adoption and self-update have separate acceptance gates.
 4. Open Project Setup in Hub and approve the hosted-view prompt. Confirm required
    Android and Windows modules are detected.
+   If requirements are missing, choose **Set up and create project**, review the
+   installation/licence confirmation, and approve the expected Windows prompts.
+   Complete Unity sign-in/activation if requested, then return to Setup. Already
+   installed tools should be reused. Download sizes/rates may be unavailable;
+   installation stages are not a time-remaining estimate.
    Create a disposable Creator SDK project and wait for validation to complete.
 5. Open that project in Unity and check for compile errors or a Visual Scripting
    initialization prompt. Inspect its `.creator-project-setup` logs and receipt.

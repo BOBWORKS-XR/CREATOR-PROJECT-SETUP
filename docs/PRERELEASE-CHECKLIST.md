@@ -1,4 +1,24 @@
-# Windows 0.3.0-alpha.1 Candidate
+# Windows Prerelease Evidence
+
+## Alpha.6 Preparation (2026-09-13)
+
+Source-clean [candidate run 34754280271](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754280271)
+passed for `a025a112519994670af8f48d848e408ec9dfa492`: 63 Rust unit tests,
+two executable-identity tests, 57 UI tests, strict Clippy, portable ZIP,
+installer guard and original licence notices for 299 dependencies. The seven
+candidate file sizes and hashes were independently checked after downloading.
+
+[Installed acceptance 34754654023](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754654023)
+passed all three public baselines: stable 0.2.2, alpha.1 and alpha.2. Each reused
+the exact candidate, tested active owned-process refusal with unchanged snapshots,
+cooperative exit, successful update, payload/notices/synthetic data preservation,
+and real GUI startup and normal close. Source, version and hashes match in all
+three receipts. This does not prove every historical or custom-path upgrade.
+
+Publication remains pending paired Hub verification. See the
+[alpha.6 release notes](RELEASE-0.3.0-alpha.6.md) for current scope and limitations.
+
+## Alpha.1 Historical Evidence
 
 This records the preparation and acceptance history for the published
 [Setup 0.3.0-alpha.1 prerelease](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.3.0-alpha.1).

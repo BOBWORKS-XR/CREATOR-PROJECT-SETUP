@@ -34,6 +34,8 @@ Use the Windows installer or portable ZIP; keep the included `licenses` folder.
 Close Setup normally before upgrading. Both forms work standalone without Hub
 or MCP. Windows binaries are not Authenticode signed; signed Hub download
 metadata is a separate verification mechanism.
+The footer retains `0.3.0-alpha.6 candidate`: these are the exact tested files,
+not a cosmetically rebuilt installer.
 
 For hosted use, the coordinated version is **Creator Hub 0.1.0-alpha.6**. Update
 Hub first. Creator Works MCP **2.7.0-alpha.1** remains the matching unchanged
@@ -47,9 +49,21 @@ its project list refreshes.
 
 ## Verification And Limits
 
-Final source-clean CI artifact and installed-upgrade evidence will be recorded
-here before publication. Earlier local alpha.6 testing is not evidence for a
-different CI executable: it covered a real alpha.1 upgrade/refusal with restoration,
+[Clean candidate checks](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754280271)
+passed from source `a025a112519994670af8f48d848e408ec9dfa492`: 63 Rust unit tests,
+two executable-identity tests, 57 browser tests, strict Clippy, complete original
+notices, portable ZIP and installer guard checks. Six explicit live tests are
+separate from that candidate run.
+
+[Installed upgrade acceptance](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754654023)
+passed on three disposable Windows runners, from public stable 0.2.2, alpha.1
+and alpha.2. All used the same exact candidate installer: active owned-process
+refusal, unchanged refusal snapshots, cooperative exit, successful update,
+installed executable/notices, synthetic preservation data, real GUI startup and
+normal close passed. This does not prove arbitrary user-settings migration.
+
+Earlier local alpha.6 testing is not evidence for a different CI executable:
+it covered a real alpha.1 upgrade/refusal with restoration,
 project compilation/Visual Scripting/reopen validation, and a matched hosted run
 with normal close. The hosted retry required observer assistance with the test
 harness. Fully unattended testing of that final harness remains separate.

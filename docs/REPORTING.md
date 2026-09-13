@@ -20,7 +20,7 @@ Existing-project repair/validation reports and logs remain inside the operation'
 
 ## Review Before Sharing
 
-For the unreleased alpha.3 prerequisite-installation candidate, failures before
+For the alpha.6 prerequisite-installation prerelease, failures before
 project creation also write local reports under
 `%LOCALAPPDATA%\CreatorProjectSetup\logs\requirements-<id>\`. Keep
 `requirements-receipt.json` and the relevant installer log. The error displays
@@ -42,13 +42,14 @@ with reviewed/redacted information:
 Setup version:
 Standalone or Creator Hub (include Hub version):
 Windows version:
-Action: new project / existing-project validation / repair
+Action: install requirements / new project / existing-project validation / repair
 Unity version:
 SDK recipe shown:
 Exact error:
 Steps before the failure:
 Does it repeat? If retried, what changed?
-Reviewed attachments: screenshot / receipt / relevant Unity log excerpt
+Last stage shown (include elapsed time for downloads/installations):
+Reviewed attachments: screenshot / receipt / relevant installer or Unity log excerpt
 ```
 
 Keep the original files locally. Do not delete a failed project, reset Library,
