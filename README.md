@@ -9,7 +9,31 @@ packaging support. Windows is the first physically tested platform; macOS and
 Linux packages remain preview quality until their full Unity workflows have
 been exercised on real machines.
 
-## Windows Prerelease: 0.3.0-alpha.2
+## Windows Prerelease Preparation: 0.3.0-alpha.6
+
+The next coordinated Windows prerelease adds **Set up and create project**:
+install missing approved Unity requirements, then create and validate a Creator
+SDK project from one starting action. Unity sign-in, licences and Windows
+administrator approvals still need your input.
+
+- Pinned Editor, Android SDK/NDK/OpenJDK, Windows support and URP template checks.
+- Approved installation of missing prerequisites, preserving unrelated Editors.
+- Download size, received bytes and recent speed when measurable. Unity speeds
+  are estimates from installer-file growth, not a promise of faster downloads.
+- Requirements refresh from native checks before project import finishes.
+- Creator SDK setup, Visual Scripting initialization and second-session validation.
+- Detailed errors and versioned local logs/receipts, with no automatic uploads.
+- Corrected Creator Hub menu link to the Hub releases page.
+
+The matching hosted version is **Creator Hub 0.1.0-alpha.6**; standalone Setup
+does not require Hub. **Creator Works MCP 2.7.0-alpha.1** remains unchanged and
+does not require Project Setup. Update Hub first for the new hosted Setup view.
+
+Publication is pending final clean CI builds, installed-upgrade checks and paired
+Hub verification. See [alpha.6 release notes](docs/RELEASE-0.3.0-alpha.6.md) for
+the test scope and known limitations. Earlier public downloads below are unchanged.
+
+## Previous Windows Prerelease: 0.3.0-alpha.2
 
 This diagnostics hotfix makes failed setup reports more useful. It identifies
 recognized Unity package-download errors and records the Setup version and time
@@ -96,7 +120,7 @@ validation run. Creator SDK `4.0.14` declares URP `17.4.0`, but the approved
 Unity 6000.3 Editor resolves its built-in URP `17.3.0`; the application records
 both the declared and observed values instead of hiding that discrepancy.
 
-## First Release Scope
+## Prerequisite Installation
 
 **Published 0.3.0-alpha.2 detects missing prerequisites; it does not install them.** This includes
 the pinned Unity Editor, Android tools and Windows build support. If the Editor
@@ -106,29 +130,14 @@ the Unity requirements are present. Guided prerequisite installation is the
 [next priority](docs/PLAN.md#next-priority---prerequisite-installation-candidate),
 not a feature of the published diagnostics hotfix.
 
-The isolated [alpha.3 candidate](docs/PREREQUISITE-CANDIDATE.md) adds an approved
-Windows installation flow behind **Set up and create project**. Real
-disposable-Windows installation, reuse, isolated Java repair and the
-licence-handoff check [passed](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34602021240).
-Fresh-user sign-in and project creation after that installation still need
-real-PC acceptance; this is not yet a released feature.
+The alpha.6 candidate combines the prerequisite installer with download metrics,
+native Requirements refresh and the Hub menu correction. See the
+[development and test history](docs/PREREQUISITE-CANDIDATE.md). Earlier
+[disposable-Windows installation checks](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34602021240)
+and separate licensed-PC project tests passed; these are not proof of the combined
+fresh-user sign-in-to-finished-project flow. That remains a user-testing boundary.
 
-The separate unreleased **alpha.4** candidate adds file size, downloaded bytes and
-estimated Unity download speed. It measures installer-file growth rather than
-converting Unity's grouped percentage into bytes. Hub transfer uses its HTTP byte
-count. Unavailable measurements and quiet transfers are shown honestly; this is
-download visibility, not a speed improvement. See the
-[candidate notes](docs/PREREQUISITE-CANDIDATE.md#alpha4-download-visibility).
-
-The unreleased **alpha.5** follow-up retains that visibility and updates the
-requirements panel from the native checks when project creation begins. It no
-longer retains the startup "Missing" label throughout import and compilation.
-Download completion alone is not treated as proof of an installed Editor.
-
-The local **alpha.6** checkpoint includes both improvements and replaces the
-old Hub planning-document menu link with the Creator Hub releases page. Matched
-Hub hosting and a second-PC run are separate acceptance checks; this candidate
-does not change the public downloads above.
+## Project Workflows
 
 - Detect Unity Hub, Unity CLI, compatible Editors, and required build modules.
 - Create a new project from the matching Editor's official 3D URP template.

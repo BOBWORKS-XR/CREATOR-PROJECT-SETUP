@@ -52,7 +52,7 @@ test('candidate and public baseline pins have complete SHA-256 digests', () => {
     assert.match(pin[key], /^[a-f0-9]{64}$/);
   }
   assert.match(pin.sourceRevision, /^[a-f0-9]{40}$/);
-  assert.deepEqual(Object.keys(pin.baselines).sort(), ['0.2.2', '0.3.0-alpha.1']);
+  assert.deepEqual(Object.keys(pin.baselines).sort(), ['0.2.2', '0.3.0-alpha.1', '0.3.0-alpha.2']);
   for (const [version, baseline] of Object.entries(pin.baselines)) {
     assert.equal(baseline.url, `https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/download/v${version}/Creator-Project-Setup-${version}-Windows-setup.exe`);
     assert.match(baseline.installerSha256, /^[a-f0-9]{64}$/);
