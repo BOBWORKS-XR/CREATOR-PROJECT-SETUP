@@ -40,3 +40,15 @@ every project, player builds, hosted spaces or headset behavior. Review package
 file selections and logs before importing or sharing them.
 
 Reporting: https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/blob/master/docs/REPORTING.md
+
+## Release Evidence
+
+- [Final Windows build and source checks](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/35003479084).
+- [Installed upgrades from 0.2.2, alpha.1, alpha.2 and alpha.6](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/35004470795), preserving synthetic settings and refusing replacement while active.
+- The actual installed app refused close while its folder chooser was active,
+  returned safely on Cancel and exited normally when idle. Its approved Plugins
+  icon was verified inside the packaged frontend.
+
+Installer SHA-256: `1cb72e2ea31345a4679aabf2b0756e847b10b68bc2043988147c2449584e02f2`.
+App source: `f8d5423df9a477ceb65ec62a00358c7900703b66`.
+Later acceptance/history commits do not alter the application source or artifact.
