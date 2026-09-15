@@ -1,6 +1,22 @@
 # Windows Prerequisite Installation Candidate
 
-Status: unreleased `0.3.0-alpha.6`, branch `feat/prerequisite-setup`.
+Status: published Windows prerelease `0.3.0-alpha.6`. The following is its
+development history; older local artifacts are not the published CI binaries.
+
+## Alpha.6 Release (2026-09-13)
+
+The clean committed candidate and all three installed upgrades have passed:
+[candidate](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754280271),
+[stable 0.2.2 / alpha.1 / alpha.2 upgrades](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754654023).
+Signed release metadata is prepared for the exact CI installer and extracted
+executable, with minimum Creator Hub 0.1.0-alpha.6. The
+[fresh prerequisite test](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754298548)
+and [paired Hub staged matrix](https://github.com/BOBWORKS-XR/CREATOR-HUB/actions/runs/34754847040)
+also passed. All 11 Setup public assets match the accepted stage, including
+signature and tamper-rejection checks. Hub records public-feed acceptance separately.
+Current verification and limitations are in the
+[alpha.6 release notes](RELEASE-0.3.0-alpha.6.md); the sections below preserve
+earlier local candidate results and must not be read as tests of the new CI bytes.
 
 ## Alpha.6 Matched-Candidate Checkpoint
 
@@ -198,8 +214,8 @@ pinned to this executable. Do not update that pin before candidate acceptance.
 
 ## Other-PC Acceptance
 
-Use the exact standalone alpha.3 candidate, not the Setup version currently
-embedded in the published Hub. Keep the portable package and its notices
+Use the exact alpha.6 prerelease, with matching Creator Hub
+alpha.6 for hosted testing, or standalone. Keep the portable package and its notices
 together. Do not uninstall existing Editors or delete projects for this test.
 
 1. Choose a new project name and parent folder with enough free space. Select

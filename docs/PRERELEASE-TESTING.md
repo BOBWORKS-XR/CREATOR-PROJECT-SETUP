@@ -4,9 +4,11 @@ Use the prerelease assets from the three repositories, not old stable installers
 or a random local development build. Each release must identify its tested source,
 installer hashes, checksums and remaining limits. The suite is not yet a stable release.
 
-Start with [Creator Hub 0.1.0-alpha.3](https://github.com/BOBWORKS-XR/CREATOR-HUB/releases/tag/v0.1.0-alpha.3).
+The coordinated pair is Creator Hub 0.1.0-alpha.6 and
+Project Setup 0.3.0-alpha.6. Start with
+[Creator Hub 0.1.0-alpha.6](https://github.com/BOBWORKS-XR/CREATOR-HUB/releases/tag/v0.1.0-alpha.6).
 It can install the matching
-[Project Setup 0.3.0-alpha.1](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.3.0-alpha.1)
+[Project Setup 0.3.0-alpha.6](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.3.0-alpha.6)
 and [Creator Works MCP 2.7.0-alpha.1](https://github.com/BOBWORKS-XR/CREATOR-WORKS-UNITY-MCP/releases/tag/v2.7.0-alpha.1)
 after approval. Both apps remain usable standalone. MCP does not depend on Setup;
 use the MCP-only route below when you already have a Unity project.
@@ -33,6 +35,11 @@ use the MCP-only route below when you already have a Unity project.
    registry entries. Hosting/adoption and self-update have separate acceptance gates.
 4. Open Project Setup in Hub and approve the hosted-view prompt. Confirm required
    Android and Windows modules are detected.
+   If requirements are missing, choose **Set up and create project**, review the
+   installation/licence confirmation, and approve the expected Windows prompts.
+   Complete Unity sign-in/activation if requested, then return to Setup. Already
+   installed tools should be reused. Download sizes/rates may be unavailable;
+   installation stages are not a time-remaining estimate.
    Create a disposable Creator SDK project and wait for validation to complete.
 5. Open that project in Unity and check for compile errors or a Visual Scripting
    initialization prompt. Inspect its `.creator-project-setup` logs and receipt.
@@ -87,6 +94,16 @@ For project setup include the validation receipt and the smallest useful Unity l
 excerpt. A screenshot of the final message alone is not proof of successful setup.
 
 ## What Automated Tests Do Not Establish
+
+For the current alpha.6 pair, [Setup candidate checks](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754280271),
+[three installed upgrades](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754654023),
+[fresh prerequisite installation/reuse/JDK repair](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754298548),
+and the [Hub public-feed native matrix](https://github.com/BOBWORKS-XR/CREATOR-HUB/actions/runs/34756015590)
+passed. The latter reused the exact staged-tested Hub binary without staging.
+It covers clean, older-app and MCP-only routes, not Unity creation or self-update.
+The prerequisite test used no Unity account and did not create a project.
+
+Earlier alpha.1 evidence below is retained as history, not relabelled as alpha.6.
 
 The [native Hub matrix](https://github.com/BOBWORKS-XR/CREATOR-HUB/actions/runs/34536443333)
 passed clean-install, older-app upgrade and MCP-only routes against unchanged

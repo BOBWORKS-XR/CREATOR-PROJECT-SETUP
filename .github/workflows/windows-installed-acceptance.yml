@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        baseline: ['0.2.2', '0.3.0-alpha.1', '0.3.0-alpha.6']
+        baseline: ['0.2.2', '0.3.0-alpha.1', '0.3.0-alpha.2', '0.3.0-alpha.6']
     steps:
       - uses: actions/checkout@v6
         with:

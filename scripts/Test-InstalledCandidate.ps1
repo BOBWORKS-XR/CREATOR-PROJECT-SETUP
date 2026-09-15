@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)][string]$CandidateDirectory,
-    [ValidateSet('0.2.2', '0.3.0-alpha.1', '0.3.0-alpha.6')][string]$BaselineVersion = '0.2.2'
+    [ValidateSet('0.2.2', '0.3.0-alpha.1', '0.3.0-alpha.2', '0.3.0-alpha.6')][string]$BaselineVersion = '0.2.2'
 )
 $ErrorActionPreference = 'Stop'
 # This script runs real installers. Check the environment before resolving targets.

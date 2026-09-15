@@ -77,6 +77,8 @@ code safety. Contributor instructions and project validation still matter.
 Release acceptance evidence identifies exact binaries. Older results remain in
 the [historical README](docs/README-HISTORY-20260915.md). This repository remains
 active; merging Setup into Hub is a future phase, not part of 0.3.0.
+The later published alpha.6 acceptance notes are also retained in the
+[alpha.6 release history](docs/README-ALPHA6-RELEASE-HISTORY.md).
 
 ## Development
 

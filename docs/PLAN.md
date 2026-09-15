@@ -48,10 +48,12 @@ macOS/Linux acceptance. Backups are selective; failure recovery is manual.
 
 ## Next Priority - Prerequisite Installation Candidate
 
-An isolated Windows-first alpha.6 implementation is under validation. Alpha.3
+The Windows-first alpha.6 implementation is now a published prerelease. Alpha.3
 installation evidence is retained; alpha.4 adds download size/rate visibility,
 and alpha.5 refreshes the installed requirements before project import. Alpha.6
-adds the Hub menu correction and a matched-candidate test checkpoint. See the
+adds the Hub menu correction. Clean CI and actual installed upgrades from stable
+0.2.2 and prereleases alpha.1/alpha.2 have passed, along with a fresh prerequisite
+installation/reuse/JDK-repair run and paired Hub staged native tests. See the
 [candidate flow and release gates](PREREQUISITE-CANDIDATE.md). The historical gap
 below still describes published alpha.2; do not treat the candidate as released.
 
@@ -61,16 +63,17 @@ OpenJDK damage, executed Java/javac/ADB/NDK clang and required an activation
 handoff without using an account or creating a project. A separate healthy-PC
 project creation/reopen smoke passed. These are two separate results, not proof
 of the complete fresh-user account-to-project flow. Native sign-in/UAC and that
-combined flow remain release gates, as does acceptance of the paired Hub build.
+combined flow remain stable-promotion gates; the prerelease documents those
+limits. Acceptance of the paired Hub build remains a prerelease gate.
 
-A fresh-PC report on 2026-09-11 shows Unity Hub 3.13.0 present but the pinned
+Historical starting point: a fresh-PC report on 2026-09-11 shows Unity Hub 3.13.0 present but the pinned
 Editor, modules and template absent. Source inspection confirms that the app
 only probes those requirements and opens Hub; it never runs an Editor/module
 installation. This is a gap against the intended beginner setup workflow, not
 evidence that the user used it incorrectly. The diagnostics alpha.2 hotfix does
 not add prerequisite installation.
 
-Planned Windows-first flow:
+Original Windows-first implementation plan:
 
 - Offer one explicit **Install requirements** action. Preview the exact Editor,
   required Android/Windows components, install location and available disk space.

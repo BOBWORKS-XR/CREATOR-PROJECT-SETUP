@@ -1,7 +1,7 @@
 # Creator Project Setup 0.3.0-alpha.6
 
-Windows prerequisite-installation prerelease. Publication preparation is in
-progress; stable 0.2.2 and earlier prerelease assets remain unchanged.
+Windows prerequisite-installation prerelease. Stable 0.2.2 and earlier
+prerelease assets remain unchanged.
 
 ## What Changed Since Alpha.2
 
@@ -34,6 +34,8 @@ Use the Windows installer or portable ZIP; keep the included `licenses` folder.
 Close Setup normally before upgrading. Both forms work standalone without Hub
 or MCP. Windows binaries are not Authenticode signed; signed Hub download
 metadata is a separate verification mechanism.
+The footer retains `0.3.0-alpha.6 candidate`: these are the exact tested files,
+not a cosmetically rebuilt installer.
 
 For hosted use, the coordinated version is **Creator Hub 0.1.0-alpha.6**. Update
 Hub first. Creator Works MCP **2.7.0-alpha.1** remains the matching unchanged
@@ -47,18 +49,42 @@ its project list refreshes.
 
 ## Verification And Limits
 
-Final source-clean CI artifact and installed-upgrade evidence will be recorded
-here before publication. Earlier local alpha.6 testing is not evidence for a
-different CI executable: it covered a real alpha.1 upgrade/refusal with restoration,
+[Clean candidate checks](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754280271)
+passed from source `a025a112519994670af8f48d848e408ec9dfa492`: 63 Rust unit tests,
+two executable-identity tests, 57 browser tests, strict Clippy, complete original
+notices, portable ZIP and installer guard checks. Six explicit live tests are
+separate from that candidate run.
+
+[Installed upgrade acceptance](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754654023)
+passed on three disposable Windows runners, from public stable 0.2.2, alpha.1
+and alpha.2. All used the same exact candidate installer: active owned-process
+refusal, unchanged refusal snapshots, cooperative exit, successful update,
+installed executable/notices, synthetic preservation data, real GUI startup and
+normal close passed. This does not prove arbitrary user-settings migration.
+
+Earlier local alpha.6 testing is not evidence for a different CI executable:
+it covered a real alpha.1 upgrade/refusal with restoration,
 project compilation/Visual Scripting/reopen validation, and a matched hosted run
 with normal close. The hosted retry required observer assistance with the test
 harness. Fully unattended testing of that final harness remains separate.
 
-Earlier [disposable Windows prerequisite installation](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34602021240)
-installed and checked the real Hub, Editor and Android tools, reused the install,
-repaired isolated OpenJDK damage, and verified the activation handoff without
-using a Unity account. It did not create a project. That earlier source and the
-separate licensed-PC project tests do not prove the complete fresh-user flow.
+[Fresh disposable Windows prerequisite acceptance](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/actions/runs/34754298548)
+passed on the same alpha.6 source. It installed and checked the real Hub, Editor
+and Android tools, reused the install, repaired isolated OpenJDK damage, executed
+Java/javac, ADB and NDK clang, and required the activation handoff without using
+a Unity account. The native test took 1,437.87 seconds, excluding CI preparation.
+Actual Hub HTTP transfers and Unity Editor/Android module downloads produced
+byte and recent-rate measurements. Quick/cache-hit components can still have
+no speed reading. These are observations, not an independent speed benchmark.
+This test did not create a project or activate a licence. It and the separate
+licensed-PC project tests do not prove the complete fresh-user flow.
+
+[Paired Hub staged native acceptance](https://github.com/BOBWORKS-XR/CREATOR-HUB/actions/runs/34754847040)
+passed clean-install, older-app upgrade and MCP-only routes with the exact files.
+It verified signed staged Setup metadata, approved installs, hosted views,
+retained state and busy-close refusal. The MCP-only route leaves Setup uninstalled.
+Hub's release records the separate public-feed retest; staged-cache acceptance
+does not itself prove public discovery, Unity creation or Hub self-update.
 
 Known limitations:
 
