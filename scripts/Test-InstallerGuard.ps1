@@ -107,7 +107,19 @@ try {
         }
         Start-Sleep -Milliseconds 100
     }
-    if (-not $run.HasExited) { throw "Fixture did not exit; inspect only its PID $($run.Id). No process was killed." }
+    if (-not $run.HasExited) {
+        $processes = @(Get-CimInstance Win32_Process)
+        $ownedIds = [Collections.Generic.HashSet[uint32]]::new()
+        [void]$ownedIds.Add([uint32]$run.Id)
+        for ($depth = 0; $depth -lt 8; $depth++) {
+            foreach ($process in $processes) {
+                if ($ownedIds.Contains([uint32]$process.ParentProcessId)) { [void]$ownedIds.Add([uint32]$process.ProcessId) }
+            }
+        }
+        $result.timedOutProcessTree = @($processes | Where-Object { $ownedIds.Contains([uint32]$_.ProcessId) } |
+            Select-Object ProcessId, ParentProcessId, CreationDate, ExecutablePath, CommandLine)
+        throw "Fixture did not exit; inspect only its PID $($run.Id). No process was killed."
+    }
     $run.WaitForExit()
     $result.exitCode = $run.ExitCode
     $result.legacyPageReached = Test-Path -LiteralPath $marker
