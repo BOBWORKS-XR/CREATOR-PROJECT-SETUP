@@ -15,7 +15,8 @@ if ($TargetDirectory.TrimEnd('\') -eq $sharedTarget.TrimEnd('\')) { throw 'Use a
 if (Test-Path -LiteralPath $OutputDirectory) { throw 'Output already exists; choose a new directory.' }
 if (-not (Test-Path -LiteralPath $SevenZip -PathType Leaf)) { throw '7-Zip is required for extraction; the installer is never run.' }
 $version = (Get-Content -LiteralPath (Join-Path $repo 'package.json') -Raw | ConvertFrom-Json).version
-if ($version -notmatch '^\d+\.\d+\.\d+-[0-9A-Za-z.-]+$') { throw 'Only prerelease versions can be staged.' }
+& node -e 'process.exit(require(process.argv[1]).validVersion(process.argv[2]) ? 0 : 1)' (Join-Path $PSScriptRoot 'verify-windows-candidate.cjs') $version
+if ($LASTEXITCODE -ne 0) { throw 'Use a canonical stable or prerelease version without build metadata.' }
 [void](New-Item -ItemType Directory -Path $OutputDirectory)
 $originalTarget = $env:CARGO_TARGET_DIR
 $env:CARGO_TARGET_DIR = $TargetDirectory

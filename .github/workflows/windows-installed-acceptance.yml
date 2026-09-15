@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        baseline: ['0.2.2', '0.3.0-alpha.1']
+        baseline: ['0.2.2', '0.3.0-alpha.1', '0.3.0-alpha.6']
     steps:
       - uses: actions/checkout@v6
         with:
@@ -41,9 +41,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Could not verify candidate workflow run.' }
           $run = $raw | ConvertFrom-Json
           if ($run.status -ne 'completed' -or $run.conclusion -ne 'success' -or
-              $run.head_sha -cne $pin.sourceRevision -or $run.head_branch -ne 'hub-compatibility' -or
+              $run.head_sha -cne $pin.sourceRevision -or $run.head_branch -ne 'feat/community-catalogue' -or
               $run.path -ne '.github/workflows/windows-candidate.yml' -or
-              $run.repository.full_name -cne $pin.repository -or $run.event -ne 'push') {
+              $run.repository.full_name -cne $pin.repository -or $run.event -ne 'workflow_dispatch') {
             throw 'Candidate run does not match the approved successful branch build.'
           }
           gh run download $pin.runId --repo $pin.repository --name "creator-project-setup-windows-candidate-$($pin.sourceRevision)" --dir dist/installed-source

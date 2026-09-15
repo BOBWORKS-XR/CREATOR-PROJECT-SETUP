@@ -1,2 +1,3 @@
 src/sidequest-mark-white.svg -text
 unity/com.creatorworks.plugins/** -text
+tests/fixtures/helper-alpha8/** -text

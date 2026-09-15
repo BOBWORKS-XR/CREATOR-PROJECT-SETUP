@@ -3,9 +3,14 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const { parseArgs, isDeepStrictEqual } = require('node:util');
+const semver = require('semver');
 
 const repo = path.resolve(__dirname, '..');
 const minHubVersion = '0.1.0-alpha.3';
+function validVersion(value) {
+  const parsed = typeof value === 'string' && semver.parse(value);
+  return Boolean(parsed && parsed.version === value && !parsed.build.length);
+}
 
 function validateInfo(result, version) {
   if (result.error || result.signal || result.status !== 0 || result.stderr ||
@@ -129,7 +134,7 @@ async function main() {
     throw Error('Required: --installer FILE --portable FILE --seven-zip EXE --output NEW-DIRECTORY --guard-report FILE --licenses DIRECTORY');
   }
   const version = JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')).version;
-  if (!/^\d+\.\d+\.\d+-[0-9A-Za-z.-]+$/.test(version)) throw Error('This script only stages prerelease candidates.');
+  if (!validVersion(version)) throw Error('Use a canonical stable or prerelease version without build metadata.');
   const output = path.resolve(values.output);
   if (fs.existsSync(output)) throw Error('Candidate output already exists; use a fresh directory.');
   for (const key of ['installer', 'portable', 'seven-zip']) requireExe(path.resolve(values[key]));
@@ -201,5 +206,5 @@ async function main() {
   process.stdout.write(`Candidate artifact checks passed: ${output}\nNot an installed-upgrade acceptance or publish approval.\n`);
 }
 
-module.exports = { validateInfo, validateGuard, probe, descriptor, hash, requireExe, sourceState, verifyNotices };
+module.exports = { validVersion, validateInfo, validateGuard, probe, descriptor, hash, requireExe, sourceState, verifyNotices };
 if (require.main === module) main().catch(error => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });

@@ -4,11 +4,15 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { validateInfo, validateGuard, probe, descriptor, sourceState, verifyNotices } = require('./verify-windows-candidate.cjs');
+const { validVersion, validateInfo, validateGuard, probe, descriptor, sourceState, verifyNotices } = require('./verify-windows-candidate.cjs');
 const version = '0.3.0-alpha.1';
 const info = { schemaVersion: 1, appId: 'creator-project-setup', displayName: 'Creator Project Setup', version,
   platform: 'windows', architecture: 'x86_64', capabilities: ['launch.standalone'] };
 const result = value => ({ status: 0, stdout: `${JSON.stringify(value)}\n`, stderr: '' });
+test('stable and prerelease candidates use canonical versions without build metadata', () => {
+  for (const value of ['0.3.0', '0.3.0-alpha.7']) assert.equal(validVersion(value), true);
+  for (const value of ['v0.3.0', '00.3.0', '0.3.0+other', '../0.3.0', null]) assert.equal(validVersion(value), false);
+});
 
 test('exact standalone metadata is accepted without hosting claims', () => {
   assert.deepEqual(validateInfo(result(info), version), info);

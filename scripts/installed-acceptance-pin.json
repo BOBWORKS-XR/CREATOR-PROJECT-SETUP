@@ -6,6 +6,11 @@
   "installerSha256": "204fbbd74c5f8ee6ecc2379b9f7bc197e61d206560caed41ac5594f1a93d5eaf",
   "executableSha256": "d38c3434e2e330c941eac81048efa9eaada866c3cb8f5fcc0ba75df46edc8813",
   "baselines": {
+    "0.3.0-alpha.6": {
+      "url": "https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/download/v0.3.0-alpha.6/Creator-Project-Setup-0.3.0-alpha.6-Windows-setup.exe",
+      "installerSha256": "57bc1b1047b38790b174c1dd60576b639e91453f33e27004ce5a9d8055b60547",
+      "executableSha256": "ace1fa411559e84a10cc0bc7884a14aa427ae4f3fba197cc87b2b4b3cc02d800"
+    },
     "0.2.2": {
       "url": "https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/download/v0.2.2/Creator-Project-Setup-0.2.2-Windows-setup.exe",
       "installerSha256": "b3f9ed80e9319c4ce7339836310bbfbf7342da665fef155937a5701eda2229e5",
