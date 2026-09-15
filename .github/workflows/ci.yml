@@ -47,6 +47,10 @@ jobs:
             patchelf \
             build-essential
       - run: npm ci
+      - name: Use a canonical temporary path for macOS test fixtures
+        if: runner.os == 'macOS'
+        shell: bash
+        run: echo "TMPDIR=$(node -p "require('fs').realpathSync(require('os').tmpdir())")" >> "$GITHUB_ENV"
       - run: npm run check
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - run: npm run build -- --no-bundle

@@ -21,8 +21,8 @@ not replaced. Windows publisher signing remains absent.
 
 Tagging the original build source triggered the older `release.yml` builder
 (35005022299), which would rebuild additional binaries through `tauri-action`.
-Cancellation was requested before its publish steps and the legacy workflow was
-disabled through GitHub. A v0.3.0 exclusion is now also present on master.
+All four jobs were cancelled with every publish step skipped, and the legacy
+workflow was disabled through GitHub. A v0.3.0 exclusion is also present on master.
 Do not re-enable that workflow or replay the old tag's workflow against this
 release: the old tag predates the exclusion. The immutable tag was not moved.
 Use the candidate and installed-acceptance workflows for future releases, then
