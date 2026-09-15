@@ -1,6 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod bootstrap;
+mod community;
+mod community_project;
 mod creator_hub;
 mod download_progress;
 mod hosted;
@@ -202,6 +204,105 @@ fn open_official_url(app: tauri::AppHandle, url: String) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+async fn community_catalogue(
+    handle: tauri::AppHandle,
+    refresh: bool,
+) -> Result<community::Snapshot, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _operation = lifecycle::LIFECYCLE.command()?;
+        community::catalogue_worker(handle, refresh)
+    })
+    .await
+    .map_err(|_| "Community worker failed.")?
+}
+
+#[tauri::command]
+async fn community_projects(
+    handle: tauri::AppHandle,
+) -> Result<community_project::Targets, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = lifecycle::LIFECYCLE.command()?;
+        community_project::projects_worker(handle, Vec::new())
+    })
+    .await
+    .map_err(|_| "Project discovery worker failed.")?
+}
+#[tauri::command]
+async fn choose_community_project(
+    handle: tauri::AppHandle,
+) -> Result<Option<community_project::Target>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = lifecycle::LIFECYCLE.command()?;
+        community_project::pick_worker(handle)
+    })
+    .await
+    .map_err(|_| "Project selection worker failed.")?
+}
+#[tauri::command]
+async fn install_community_menu(
+    handle: tauri::AppHandle,
+    project_id: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = lifecycle::LIFECYCLE.command()?;
+        community_project::install_worker(handle, project_id)
+    })
+    .await
+    .map_err(|_| "Unity menu worker failed.")?
+}
+#[tauri::command]
+async fn queue_community_import(
+    handle: tauri::AppHandle,
+    id: String,
+    project_id: String,
+) -> Result<community_project::Outcome, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = lifecycle::LIFECYCLE.command()?;
+        community::queue_import_worker(handle, id, project_id)
+    })
+    .await
+    .map_err(|_| "Unity import queue worker failed.")?
+}
+#[tauri::command]
+async fn community_import_status(
+    handle: tauri::AppHandle,
+    project_id: String,
+    request_id: String,
+) -> Result<community_project::Outcome, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = lifecycle::LIFECYCLE.command()?;
+        community_project::status_worker(handle, project_id, request_id)
+    })
+    .await
+    .map_err(|_| "Unity receipt worker failed.")?
+}
+#[tauri::command]
+async fn open_community_link(
+    handle: tauri::AppHandle,
+    id: String,
+    kind: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _operation = lifecycle::LIFECYCLE.command()?;
+        community::open_link_worker(handle, id, kind)
+    })
+    .await
+    .map_err(|_| "Community link worker failed.")?
+}
+#[tauri::command]
+async fn download_community_package(
+    handle: tauri::AppHandle,
+    id: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _operation = lifecycle::LIFECYCLE.command()?;
+        community::download_worker(handle, id)
+    })
+    .await
+    .map_err(|_| "Community download worker failed.")?
+}
+
 fn main() {
     // Metadata queries must never initialize the GUI or touch project settings.
     let startup = creator_hub::startup_mode(std::env::args_os().skip(1));
@@ -227,6 +328,8 @@ fn main() {
         None
     };
     tauri::Builder::default()
+        .manage(community::Community::default())
+        .manage(community_project::ProjectImports::default())
         .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
             if let Some(files) = files {
@@ -261,7 +364,15 @@ fn main() {
             register_project,
             inspect_project,
             run_existing_project,
-            open_official_url
+            open_official_url,
+            community_catalogue,
+            community_projects,
+            choose_community_project,
+            install_community_menu,
+            queue_community_import,
+            community_import_status,
+            open_community_link,
+            download_community_package
         ])
         .build(context)
         .expect("error while running Creator Project Setup")

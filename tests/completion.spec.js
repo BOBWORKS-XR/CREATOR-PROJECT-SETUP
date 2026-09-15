@@ -259,6 +259,7 @@ async function setup(page, options = {}) {
       return () => { delete window.eventCallbacks[name]; if (name === 'setup-progress') window.progressCallback = null; };
     } }, core: { invoke: async (command, args) => {
       window.calls.push({ command, args });
+      if (command === 'community_catalogue') return { entries: window.options.community || [], warnings: [], stale: false };
       if (command === 'probe_environment' && window.options.probeError) throw window.options.probeError;
       if (command === 'probe_environment') return {
         platform: window.options.platform || 'windows', ready: !window.options.missingUnity, hubInstalled: !window.options.missingHub, unityCliInstalled: false,
@@ -640,10 +641,26 @@ test('app switcher supports keyboard, outside dismissal and bounded links', asyn
   await expect(trigger).toBeFocused();
   await trigger.click();
   await page.keyboard.press('End');
-  await expect(page.locator('#suite-current')).toBeFocused();
+  await expect(page.locator('#suite-plugins')).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(page.locator('#suite-menu')).toBeHidden();
   expect(await page.evaluate(() => window.calls.every(call => ['probe_environment', 'open_official_url'].includes(call.command)))).toBe(true);
+});
+
+test('Plugins is in Setup and switching back preserves a running project workflow', async ({ page }) => {
+  await setup(page, { pending: true, community: [require('./fixtures/community/start-location.json')] });
+  await page.locator('#create-button').click();
+  await page.locator('#suite-trigger').click(); await page.locator('#suite-plugins').click();
+  await expect(page.locator('#plugins-title')).toBeFocused();
+  await expect(page.locator('#view-plugins')).toContainText('Start Location');
+  await expect(page.locator('#setup-workspace')).toBeHidden();
+  await page.evaluate(() => window.progressCallback({ payload: { step: 3, detail: 'Compiling while browsing' } }));
+  await page.locator('#suite-trigger').click(); await page.locator('#suite-current').click();
+  await expect(page.locator('#activity-message')).toHaveText('Compiling while browsing');
+  await expect(page.locator('#create-button')).toBeDisabled();
+  await page.evaluate(() => window.finishCreate());
+  await expect(page.locator('#open-project-button')).toBeEnabled();
+  expect(await page.evaluate(() => window.calls.filter(c => c.command === 'create_project').length)).toBe(1);
 });
 
 test('external link failures are visible and do not claim installation', async ({ page }) => {
@@ -655,6 +672,23 @@ test('external link failures are visible and do not claim installation', async (
   await expect(page.locator('[data-suite-link="hub"]')).toContainText('Releases');
   await page.keyboard.press('Escape');
   await expect(page.locator('#suite-trigger')).toBeFocused();
+});
+
+test('standalone Setup exposes MCP tools and AI skills without Unity import for instructions', async ({ page }) => {
+  const fixture = require('./fixtures/community/start-location.json');
+  const community = ['mcp-tool', 'ai-skill'].map(category => ({ ...fixture, id: `test.${category}`, category, name: category, download: undefined, scope: 'instructions-only', reviewStatus: 'listed' }));
+  await setup(page, { community });
+  await page.locator('#suite-trigger').click(); await page.locator('#suite-plugins').click();
+  await expect(page.locator('.community-count')).toHaveText('2 contributions');
+  for (const [category, label] of [['mcp-tool', 'MCP tools'], ['ai-skill', 'AI skills']]) {
+    await page.getByRole('button', { name: label, exact: true }).click();
+    await expect(page.locator('.community-count')).toHaveText('1 contribution');
+    await expect(page.locator('.community-item h3')).toHaveText(category);
+    await expect(page.locator('.community-type')).toHaveText(label);
+    await expect(page.getByRole('button', { name: 'Add to project' })).toHaveCount(0);
+    await expect(page.locator('.community-review')).toHaveText('Instructions only');
+  }
+  expect(await page.evaluate(() => window.calls.some(c => /install_community|queue_community|download_community/.test(c.command)))).toBe(false);
 });
 
 for (const width of [980, 720, 560, 390]) {

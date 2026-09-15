@@ -9,6 +9,19 @@ packaging support. Windows is the first physically tested platform; macOS and
 Linux packages remain preview quality until their full Unity workflows have
 been exercised on real machines.
 
+## Local Alpha.7 Candidate
+
+This branch adds **Creator Plugins** to the standalone app without creating a
+separate application. Select a project, optionally add its Unity Editor menu,
+and review a checksum-checked package in Unity before importing. Existing
+project-creation forms and progress remain available when switching pages.
+
+Candidate `0.3.0-alpha.7` is **not published yet**. Real installer upgrades and
+the matching Hub/MCP combination still need acceptance. Existing settings and
+projects must be preserved; this feature never automatically saves scenes or
+retries an asset import. See the sibling Hub's local candidate test report for
+current evidence, not the historical alpha.2 results below.
+
 ## Windows Prerelease: 0.3.0-alpha.2
 
 This diagnostics hotfix makes failed setup reports more useful. It identifies

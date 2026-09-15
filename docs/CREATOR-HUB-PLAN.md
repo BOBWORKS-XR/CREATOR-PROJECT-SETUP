@@ -1,5 +1,14 @@
 # Creator Hub: Approved Direction
 
+## Latest Packaging Direction
+
+User clarification, 2026-09-14: standalone MCP remains available, and Hub and
+Setup should also provide MCP access alongside Plugins. The proposed common
+MCP installation/settings ownership is recorded in the sibling Hub worktree's
+`docs/SHARED-MCP-DIRECTION.md`. That packaging is not implemented by the current
+Plugins preview. Version checks, migration and operation guards remain required.
+The sections below retain the earlier hosting contract and its historical tests.
+
 ## Hosted Setup Preview Implemented
 
 The current local development pair runs Setup's actual UI inside Hub, with its
