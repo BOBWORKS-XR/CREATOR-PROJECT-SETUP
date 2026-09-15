@@ -29,6 +29,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
+      - run: npm ci
       - name: Check owned fixture and local-execution refusal
         run: node --test scripts/owned-setup-fixture.test.cjs
       - name: Fetch the pinned successful candidate, without rebuilding

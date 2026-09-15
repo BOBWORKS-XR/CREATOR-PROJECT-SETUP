@@ -20,7 +20,7 @@ Existing-project repair/validation reports and logs remain inside the operation'
 
 ## Review Before Sharing
 
-For the unreleased alpha.3 prerequisite-installation candidate, failures before
+In 0.3.0 and its prerequisite-installation previews, failures before
 project creation also write local reports under
 `%LOCALAPPDATA%\CreatorProjectSetup\logs\requirements-<id>\`. Keep
 `requirements-receipt.json` and the relevant installer log. The error displays
