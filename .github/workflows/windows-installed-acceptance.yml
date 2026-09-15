@@ -31,7 +31,7 @@ jobs:
           node-version: 22
       - run: npm ci
       - name: Check owned fixture and local-execution refusal
-        run: node --test scripts/owned-setup-fixture.test.cjs
+        run: node --test scripts/owned-setup-fixture.test.cjs scripts/native-lifecycle.test.cjs
       - name: Fetch the pinned successful candidate, without rebuilding
         shell: pwsh
         env:
@@ -52,6 +52,30 @@ jobs:
       - name: Install public baseline and test the exact candidate update
         shell: pwsh
         run: ./scripts/Test-InstalledCandidate.ps1 -CandidateDirectory dist/installed-source/dist/windows-candidate/candidate -BaselineVersion '${{ matrix.baseline }}'
+      - name: Enable Setup-only loopback debugging on disposable runner
+        if: matrix.baseline == '0.3.0-alpha.6'
+        id: test-policy
+        shell: pwsh
+        run: |
+          if ($env:RUNNER_ENVIRONMENT -ne 'github-hosted') { throw 'Disposable runner required.' }
+          $key = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
+          $name = 'creator-project-setup.exe'
+          $existing = Get-Item -LiteralPath $key -ErrorAction SilentlyContinue
+          if ($existing -and $existing.GetValueNames() -contains $name) { throw 'Existing policy must not be overwritten.' }
+          New-Item -Path $key -Force | Out-Null
+          New-ItemProperty -LiteralPath $key -Name $name -Value '--remote-debugging-port=9240' -PropertyType String | Out-Null
+      - name: Test exact installed Setup busy refusal and idle close
+        if: matrix.baseline == '0.3.0-alpha.6'
+        run: node scripts/smoke-native-lifecycle-ci.cjs
+      - name: Remove only the test-specific policy
+        if: always() && steps.test-policy.outcome == 'success'
+        shell: pwsh
+        run: |
+          $key = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
+          $name = 'creator-project-setup.exe'
+          $value = (Get-ItemProperty -LiteralPath $key -Name $name -ErrorAction SilentlyContinue).$name
+          if ($value -ceq '--remote-debugging-port=9240') { Remove-ItemProperty -LiteralPath $key -Name $name }
+          elseif ($value) { throw 'Policy changed; left untouched.' }
       - name: Upload installed acceptance evidence (not a release)
         if: always()
         uses: actions/upload-artifact@v4
@@ -64,3 +88,5 @@ jobs:
             dist/installed-acceptance/before-refusal.json
             dist/installed-acceptance/after-refusal.json
             dist/installed-acceptance/after-upgrade.json
+            dist/native-lifecycle/report.json
+            dist/native-lifecycle/*.png
