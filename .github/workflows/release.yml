@@ -9,9 +9,9 @@ permissions:
 
 jobs:
   package:
-    # Prereleases publish the exact Windows candidate that passed installed acceptance.
-    # Do not silently rebuild different installers when that tested source is tagged.
-    if: ${{ !contains(github.ref_name, '-') }}
+    # Accepted candidate releases must not be rebuilt or have their assets replaced.
+    # This legacy workflow is disabled in GitHub; retain the stable exclusion too.
+    if: ${{ !contains(github.ref_name, '-') && github.ref_name != 'v0.3.0' }}
     name: Package ${{ matrix.label }}
     strategy:
       fail-fast: false
