@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        baseline: ['0.2.2', '0.3.0-alpha.1', '0.3.0-alpha.2', '0.3.0-alpha.6']
+        baseline: ['0.2.2', '0.3.0-alpha.1', '0.3.0-alpha.2', '0.3.0-alpha.6', '0.3.0']
     steps:
       - uses: actions/checkout@v6
         with:
@@ -42,7 +42,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Could not verify candidate workflow run.' }
           $run = $raw | ConvertFrom-Json
           if ($run.status -ne 'completed' -or $run.conclusion -ne 'success' -or
-              $run.head_sha -cne $pin.sourceRevision -or $run.head_branch -ne 'feat/community-catalogue' -or
+              $run.head_sha -cne $pin.sourceRevision -or $run.head_branch -ne 'feature/preview-galleries' -or
               $run.path -ne '.github/workflows/windows-candidate.yml' -or
               $run.repository.full_name -cne $pin.repository -or $run.event -ne 'workflow_dispatch') {
             throw 'Candidate run does not match the approved successful branch build.'
@@ -53,7 +53,7 @@ jobs:
         shell: pwsh
         run: ./scripts/Test-InstalledCandidate.ps1 -CandidateDirectory dist/installed-source/dist/windows-candidate/candidate -BaselineVersion '${{ matrix.baseline }}'
       - name: Enable Setup-only loopback debugging on disposable runner
-        if: matrix.baseline == '0.3.0-alpha.6'
+        if: matrix.baseline == '0.3.0'
         id: test-policy
         shell: pwsh
         run: |
@@ -65,7 +65,7 @@ jobs:
           New-Item -Path $key -Force | Out-Null
           New-ItemProperty -LiteralPath $key -Name $name -Value '--remote-debugging-port=9240' -PropertyType String | Out-Null
       - name: Test exact installed Setup busy refusal and idle close
-        if: matrix.baseline == '0.3.0-alpha.6'
+        if: matrix.baseline == '0.3.0'
         run: node scripts/smoke-native-lifecycle-ci.cjs
       - name: Remove only the test-specific policy
         if: always() && steps.test-policy.outcome == 'success'

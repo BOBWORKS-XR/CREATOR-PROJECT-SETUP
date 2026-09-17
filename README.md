@@ -3,15 +3,19 @@
 Create a SideQuest Creator SDK Unity project without editing package manifests,
 installing Git, dragging package files or using a terminal.
 
-## Windows 0.3.0
+## Windows 0.3.1
 
-**[Download Project Setup](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.3.0)**
+**[Download Project Setup](https://github.com/BOBWORKS-XR/CREATOR-PROJECT-SETUP/releases/tag/v0.3.1)**
 as a Windows installer or portable ZIP. Keep the `licenses` folder with the
 portable app. Close Setup normally before upgrading.
 
 You can also install and open it inside
-**[Creator Hub 0.1.0](https://github.com/BOBWORKS-XR/CREATOR-HUB/releases/tag/v0.1.0)**.
+**[Creator Hub 0.1.7](https://github.com/BOBWORKS-XR/CREATOR-HUB/releases/tag/v0.1.7)**.
 For hosted use, update Hub first. Standalone Setup does not require Hub or MCP.
+
+0.3.1 fixes Add Unity menu remaining blocked by a stale unlocked Unity lock file.
+Plugins gains preview galleries and streamed downloads with progress and cancel.
+See [verified upgrade checks and limits](docs/RELEASE-0.3.1.md).
 
 - Detect installed tools and show which requirements are missing.
 - With approval, install the pinned Editor, Android tools, Windows support and

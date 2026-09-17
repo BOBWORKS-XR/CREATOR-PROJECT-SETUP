@@ -256,10 +256,11 @@ async fn queue_community_import(
     handle: tauri::AppHandle,
     id: String,
     project_id: String,
+    operation_id: Option<String>,
 ) -> Result<community_project::Outcome, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let _guard = lifecycle::LIFECYCLE.command()?;
-        community::queue_import_worker(handle, id, project_id)
+        community::queue_import_worker(handle, id, project_id, operation_id)
     })
     .await
     .map_err(|_| "Unity import queue worker failed.")?
@@ -294,13 +295,30 @@ async fn open_community_link(
 async fn download_community_package(
     handle: tauri::AppHandle,
     id: String,
+    operation_id: Option<String>,
 ) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let _operation = lifecycle::LIFECYCLE.command()?;
-        community::download_worker(handle, id)
+        community::download_worker(handle, id, operation_id)
     })
     .await
     .map_err(|_| "Community download worker failed.")?
+}
+
+#[tauri::command]
+fn community_transfer_status(
+    handle: tauri::AppHandle,
+) -> Result<Option<community::transfer::Progress>, String> {
+    let _guard = lifecycle::LIFECYCLE.command()?;
+    handle.state::<community::Community>().1.status()
+}
+#[tauri::command]
+fn cancel_community_transfer(handle: tauri::AppHandle, operation_id: String) -> Result<(), String> {
+    let _guard = lifecycle::LIFECYCLE.command()?;
+    handle
+        .state::<community::Community>()
+        .1
+        .cancel(&operation_id)
 }
 
 fn main() {
@@ -372,7 +390,9 @@ fn main() {
             queue_community_import,
             community_import_status,
             open_community_link,
-            download_community_package
+            download_community_package,
+            community_transfer_status,
+            cancel_community_transfer
         ])
         .build(context)
         .expect("error while running Creator Project Setup")

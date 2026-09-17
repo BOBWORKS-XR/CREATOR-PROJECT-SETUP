@@ -1,7 +1,12 @@
 #view-plugins { color: #edf1f3; font: 13px/1.5 "Segoe UI", Arial, sans-serif; min-width: 0; }
 #view-plugins * { box-sizing: border-box; letter-spacing: 0; }
 #view-plugins .icon-folder { --icon: url("icons/folder-open.svg"); }
+#view-plugins .icon-layout-grid { --icon: url("icons/layout-grid.svg"); }
+#view-plugins .icon-list { --icon: url("icons/list.svg"); }
 body:has(#view-plugins:not(.hidden)) #suite-shell { position: absolute; }
+#view-plugins .icon-chevron-left { --icon: url("icons/chevron-left.svg"); }
+#view-plugins .icon-chevron-right { --icon: url("icons/chevron-right.svg"); }
+#view-plugins .icon-play { --icon: url("icons/play.svg"); }
 #view-plugins [hidden] { display: none !important; }
 .community-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 10px 0 22px; }
 .community-heading-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -19,6 +24,9 @@ body:has(#view-plugins:not(.hidden)) #suite-shell { position: absolute; }
 #view-plugins h2 { font-size: 22px; line-height: 1.3; font-weight: 650; margin: 0; }
 .community-subtitle { margin: 5px 0 0; color: #9ba7af; }
 .community-toolbar { display: flex; gap: 10px; align-items: center; }
+.community-view-modes { display: flex; flex: 0 0 auto; border: 1px solid #343d43; border-radius: 4px; overflow: hidden; }
+.community-view-modes .community-icon-button { border: 0; border-radius: 0; }
+.community-view-modes .community-icon-button[aria-pressed="true"] { color: #00cce8; background: #1b252a; }
 .community-search, .community-sort { height: 38px; border: 1px solid #343d43; border-radius: 4px; background: #101416; color: #edf1f3; font: inherit; padding: 0 12px; min-width: 0; }
 .community-search { flex: 1; } .community-sort { width: 144px; }
 .community-filters { display: flex; flex-wrap: wrap; gap: 4px 20px; border-bottom: 1px solid #293137; margin-top: 14px; }
@@ -63,11 +71,35 @@ body:has(#view-plugins:not(.hidden)) #suite-shell { position: absolute; }
 .community-footer { margin-top: 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; color: #85939c; font-size: 11px; }
 .community-empty { padding: 50px 16px; text-align: center; color: #9ba7af; }
 .community-empty > .icon { width: 28px; height: 28px; } .community-empty p { margin: 10px 0 18px; }
-.community-zoom { max-width: min(94vw, 1000px); max-height: 92vh; border: 1px solid #384147; border-radius: 4px; background: #101416; margin: auto; padding: 16px; }
-.community-zoom::backdrop { background: #000b; } .community-zoom img { display: block; max-width: 100%; max-height: 76vh; object-fit: contain; margin: 12px auto 0; }
+.community-list[data-layout="grid"] { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 16px; align-items: start; padding-top: 14px; }
+.community-list[data-layout="grid"] .community-item { display: flex; flex-direction: column; min-width: 0; height: 100%; gap: 0; padding: 12px; background: #101416; border: 1px solid #293137; border-radius: 6px; }
+.community-list[data-layout="grid"] .community-visual { width: 100%; flex: none; aspect-ratio: 1.5; }
+.community-list[data-layout="grid"] .community-item-body { display: flex; flex-direction: column; flex: 1; padding-top: 12px; }
+.community-list[data-layout="grid"] .community-item-actions { margin-top: auto; padding-top: 12px; gap: 8px; }
+#view-plugins .community-list[data-layout="grid"] h3 { font-size: 18px; }
+.community-list[data-layout="grid"] .community-description { margin: 10px 0; }
+.community-list[data-layout="grid"] .community-details { padding: 14px 0 0; }
+.community-list[data-layout="grid"] .community-specs { grid-template-columns: 1fr; }
+.community-list[data-layout="grid"] .community-specs > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.community-list[data-layout="grid"] .community-empty { grid-column: 1 / -1; }
+.community-image-button { position: relative; }
+.community-media-badge { position: absolute; bottom: 8px; right: 8px; background: #101416e8; color: #edf1f3; padding: 2px 7px; border-radius: 4px; font-size: 12px; }
+.community-zoom { width: min(94vw, 1000px); max-height: 92vh; overflow-y: auto; border: 1px solid #384147; border-radius: 4px; background: #101416; color: #edf1f3; margin: auto; padding: 16px; }
+.community-zoom::backdrop { background: #000b; }
+.community-media-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.community-media-header h3 { min-width: 0; }
+.community-media-header button { flex-shrink: 0; }
+.community-media-stage { height: min(58vh, 560px); min-height: 160px; display: grid; place-items: center; margin-top: 12px; background: #090c0e; }
+.community-media-stage img, .community-media-stage video { width: 100%; height: 100%; min-height: 0; max-height: min(58vh, 560px); object-fit: contain; }
+.community-media-status { min-height: 20px; margin: 8px 0; font-size: 12px; color: #bbc4ca; }
+.community-media-controls { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px; }
+.community-media-count { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
 #view-plugins :is(button,input,select,summary):focus-visible { outline: 2px solid #00cce8; outline-offset: 3px; }
 .community-link:hover, .community-filter:hover { color: #00cce8; }
 @media (max-width: 680px) {
+  .community-toolbar { flex-wrap: wrap; }
+  .community-search { flex: 1 1 100%; }
+  .community-sort { flex: 1; }
   .community-heading { align-items: flex-start; flex-wrap: wrap; margin-bottom: 16px; }
   .community-item { grid-template-columns: 150px minmax(0,1fr); gap: 0 16px; }
   .community-specs { grid-template-columns: 1fr; }
@@ -80,3 +112,5 @@ body:has(#view-plugins:not(.hidden)) #suite-shell { position: absolute; }
   .community-sort { width: 118px; padding: 0 6px; }
   .community-toolbar { gap: 6px; } .community-search { padding: 0 8px; }
 }
+.community-transfer:not([hidden]) { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 0; }
+.community-transfer > span { overflow-wrap: anywhere; }

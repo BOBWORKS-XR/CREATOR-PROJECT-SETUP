@@ -1,5 +1,27 @@
 const { test, expect } = require('@playwright/test');
 
+for (const width of [980, 390]) test(`standalone Plugins grid keeps Setup state and remembers its view at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 760 });
+  const fixture = require('./fixtures/community/start-location.json');
+  await setup(page, { community: [fixture] });
+  await page.locator('#project-name').fill('Keep this project draft');
+  await page.locator('#suite-trigger').click(); await page.locator('#suite-plugins').click();
+  await expect(page.locator('.community-list')).toHaveAttribute('data-layout', 'grid');
+  await expect(page.getByRole('button', { name: 'Grid view', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('heading', { name: 'Start Location' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.locator('#suite-trigger').click(); await page.locator('#suite-current').click();
+  await expect(page.locator('#project-name')).toHaveValue('Keep this project draft');
+  await page.reload();
+  await page.locator('#suite-trigger').click(); await page.locator('#suite-plugins').click();
+  await expect(page.locator('.community-list')).toHaveAttribute('data-layout', 'grid');
+  await page.getByRole('button', { name: 'List view', exact: true }).click();
+  await page.reload();
+  await page.locator('#suite-trigger').click(); await page.locator('#suite-plugins').click();
+  await expect(page.locator('.community-list')).toHaveAttribute('data-layout', 'list');
+  expect(await page.evaluate(() => window.calls.some(c => /install_community|queue_community|download_community/.test(c.command)))).toBe(false);
+});
+
 test('fresh Windows PC offers one setup action without a wall of dependent errors', async ({ page }, testInfo) => {
   await setup(page, { missingUnity: true, legacyHub: true });
   await expect(page.locator('#create-button')).toHaveText('Set up and create project');
