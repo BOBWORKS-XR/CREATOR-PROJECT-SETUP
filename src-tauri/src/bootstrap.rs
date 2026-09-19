@@ -218,9 +218,30 @@ fn free_space(path: &Path) -> Result<u64, String> {
     Ok(available)
 }
 
-#[cfg(not(windows))]
+#[cfg(unix)]
+fn free_space(path: &Path) -> Result<u64, String> {
+    use std::ffi::CString;
+    use std::os::unix::ffi::OsStrExt;
+    let mut existing = path;
+    while !existing.exists() {
+        existing = existing.parent().ok_or("Cannot find the install volume.")?;
+    }
+    let c_path = CString::new(existing.as_os_str().as_bytes())
+        .map_err(|_| "Invalid path for free space check.")?;
+    let mut stat: libc::statvfs = unsafe { std::mem::zeroed() };
+    if unsafe { libc::statvfs(c_path.as_ptr(), &mut stat) } == 0 {
+        Ok((stat.f_bavail as u64).saturating_mul(stat.f_frsize as u64))
+    } else {
+        Err(format!(
+            "Cannot check free space at {}. Nothing was installed.",
+            existing.display()
+        ))
+    }
+}
+
+#[cfg(not(any(windows, unix)))]
 fn free_space(_: &Path) -> Result<u64, String> {
-    Err("Automatic Unity installation is currently Windows-only.".into())
+    Err("Automatic Unity installation is not supported on this platform.".into())
 }
 
 fn check_space(plan: &Plan, project_parent: &Path) -> Result<(), String> {
@@ -309,9 +330,47 @@ fn require_editor_closed(executable: &Path) -> Result<(), String> {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
+fn require_editor_closed(executable: &Path) -> Result<(), String> {
+    let canonical_target = fs::canonicalize(executable).ok();
+    let Ok(entries) = fs::read_dir("/proc") else {
+        return Ok(());
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+        if !name_str.chars().all(|c| c.is_ascii_digit()) {
+            continue;
+        }
+        let exe_link = entry.path().join("exe");
+        if let Ok(target) = fs::read_link(&exe_link) {
+            let is_unity = target
+                .file_name()
+                .is_some_and(|n| n == "Unity" || n == "Unity.exe");
+            if is_unity {
+                let matches = target == executable
+                    || canonical_target.as_ref().is_some_and(|t| {
+                        fs::canonicalize(&target).ok().as_ref() == Some(t)
+                    });
+                if matches {
+                    return Err(format!(
+                        "Unity {EDITOR_VERSION} is running. Save your work and close its Editor windows before adding modules. Nothing was force-closed."
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
 fn require_editor_closed(_: &Path) -> Result<(), String> {
-    Err("Automatic installation is Windows-only.".into())
+    Ok(())
+}
+
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
+fn require_editor_closed(_: &Path) -> Result<(), String> {
+    Err("Automatic installation is not supported on this platform.".into())
 }
 
 fn compact(value: &str) -> String {
@@ -711,13 +770,10 @@ fn ensure_inner(
     let target = logic::creation_target(request)?;
     let initial = logic::probe_environment();
     if can_reuse(initial.ready, initial.hub_installed, require_hub) {
-        if cfg!(windows) && free_space(target.parent().unwrap())? < 8 * GIB {
+        if free_space(target.parent().unwrap())? < 8 * GIB {
             return Err("Project creation needs an 8 GiB free-space reserve for package downloads and imports. Choose a location with more space before starting.".into());
         }
         return Ok(());
-    }
-    if !cfg!(windows) {
-        return Err("Automatic prerequisite installation is currently Windows-only. Install the listed requirements through Unity Hub, then create your project.".into());
     }
     let logs = dirs::data_local_dir()
         .ok_or("Local application data is unavailable.")?
@@ -822,12 +878,20 @@ fn ensure_inner(
         if plan.install_hub {
             emit(progress(
                 "Installing Unity Hub",
-                "Downloading the official signed installer. Windows may ask for approval.",
+                if cfg!(windows) {
+                    "Downloading the official signed installer. Windows may ask for approval."
+                } else {
+                    "Installing Unity Hub via the official Unity CLI."
+                },
             ));
             #[cfg(windows)]
             crate::hub_installer::install(&logs, &emit)?;
+            #[cfg(not(windows))]
+            {
+                run_cli(&helper, &strings(&["hub", "install"]), "hub-install", &logs, false, &emit)?;
+            }
             if !logic::probe_environment().hub_installed {
-                return Err("Unity Hub did not appear after installation. Check the Windows installer and local logs before retrying.".into());
+                return Err("Unity Hub did not appear after installation. Check local logs before retrying.".into());
             }
         }
         if plan.action != Action::None {
@@ -1417,5 +1481,19 @@ mod tests {
         assert!(check_plan_current(&plan, &changed, &json!([])).is_err());
         fs::create_dir(&plan.editor_root).unwrap();
         assert!(check_plan_current(&plan, &paths, &json!([])).is_err());
+    }
+
+    #[test]
+    fn free_space_returns_valid_measurement_for_existing_directory() {
+        let temp = tempfile::tempdir().unwrap();
+        let bytes = free_space(temp.path()).unwrap();
+        assert!(bytes > 0);
+    }
+
+    #[test]
+    fn require_editor_closed_allows_when_no_matching_editor_runs() {
+        let temp = tempfile::tempdir().unwrap();
+        let dummy = temp.path().join("Unity");
+        assert!(require_editor_closed(&dummy).is_ok());
     }
 }
