@@ -338,6 +338,17 @@ fn main() {
         }
         creator_hub::StartupMode::Standalone | creator_hub::StartupMode::Hosted => {}
     }
+
+    // Work around WebKitGTK failures on Wayland sessions and certain GPU
+    // drivers where the DMA-BUF renderer cannot allocate backing buffers
+    // ("Failed to create GBM buffer ... Error 71 (Protocol error) dispatching to Wayland display").
+    #[cfg(target_os = "linux")]
+    {
+        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+    }
+
     let mut context = tauri::generate_context!();
     let files = if startup == creator_hub::StartupMode::Hosted {
         context.config_mut().app.windows.clear();

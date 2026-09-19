@@ -256,7 +256,7 @@ test('licence links are explicit and unsupported platforms do not offer automati
   await setup(page, { missingUnity: true });
   await page.locator('[data-terms="android"]').click();
   expect(await page.evaluate(() => window.calls.at(-1))).toEqual({ command: 'open_official_url', args: { url: 'https://developer.android.com/studio/terms' } });
-  await page.evaluate(() => { window.options.platform = 'linux'; });
+  await page.evaluate(() => { window.options.platform = 'unknown'; });
   await page.locator('#refresh-button').click();
   await expect(page.locator('#create-button')).toBeDisabled();
   await expect(page.locator('#requirements-consent')).toBeHidden();

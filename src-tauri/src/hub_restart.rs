@@ -3,10 +3,88 @@ use std::path::Path;
 pub fn restart(executable: &Path) -> Result<(), String> {
     #[cfg(windows)]
     return windows::restart(executable);
-    #[cfg(not(windows))]
+    #[cfg(unix)]
+    return unix::restart(executable);
+    #[cfg(not(any(windows, unix)))]
     {
         let _ = executable;
-        Err("Fully quit Unity Hub, then choose Open Unity Hub. Automatic restart is currently available on Windows only.".into())
+        Err("Fully quit Unity Hub, then choose Open Unity Hub. Automatic restart is not supported on this platform.".into())
+    }
+}
+
+#[cfg(unix)]
+mod unix {
+    use std::fs;
+    use std::path::Path;
+    use std::process::Command;
+    use std::thread::sleep;
+    use std::time::{Duration, Instant};
+
+    pub fn restart(executable: &Path) -> Result<(), String> {
+        let canonical_exec = fs::canonicalize(executable).map_err(|e| e.to_string())?;
+        let current_pid = std::process::id() as libc::pid_t;
+        let mut hub_pids = Vec::new();
+
+        #[cfg(target_os = "linux")]
+        {
+            if let Ok(entries) = fs::read_dir("/proc") {
+                for entry in entries.flatten() {
+                    let name = entry.file_name();
+                    let name_str = name.to_string_lossy();
+                    if let Ok(pid) = name_str.parse::<libc::pid_t>() {
+                        if pid == current_pid || pid <= 1 {
+                            continue;
+                        }
+                        let exe_link = entry.path().join("exe");
+                        if let Ok(target) = fs::read_link(&exe_link) {
+                            if target == canonical_exec
+                                || fs::canonicalize(&target).ok().as_ref() == Some(&canonical_exec)
+                            {
+                                hub_pids.push(pid);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Request graceful shutdown of discovered Unity Hub processes
+        for &pid in &hub_pids {
+            unsafe {
+                libc::kill(pid, libc::SIGTERM);
+            }
+        }
+
+        // Wait up to 5 seconds for processes to terminate
+        let start = Instant::now();
+        while start.elapsed() < Duration::from_secs(5) {
+            let any_alive = hub_pids
+                .iter()
+                .any(|&pid| unsafe { libc::kill(pid, 0) == 0 });
+            if !any_alive {
+                break;
+            }
+            sleep(Duration::from_millis(100));
+        }
+
+        let still_alive: Vec<libc::pid_t> = hub_pids
+            .into_iter()
+            .filter(|&pid| unsafe { libc::kill(pid, 0) == 0 })
+            .collect();
+
+        if !still_alive.is_empty() {
+            return Err("Unity Hub did not shut down in time. Save any open projects and close Unity Hub manually.".into());
+        }
+
+        // Relaunch Unity Hub
+        Command::new(executable)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .map_err(|e| format!("Cannot relaunch Unity Hub: {e}"))?;
+
+        Ok(())
     }
 }
 

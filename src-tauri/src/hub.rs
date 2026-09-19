@@ -26,7 +26,12 @@ pub struct HubRegistration {
 }
 
 pub fn detected_hub_version() -> Option<String> {
-    let path = dirs::config_dir()?.join("UnityHub/hubInfo.json");
+    let config = dirs::config_dir()?;
+    let path = if config.join("unityhub/hubInfo.json").is_file() {
+        config.join("unityhub/hubInfo.json")
+    } else {
+        config.join("UnityHub/hubInfo.json")
+    };
     let file = File::open(path).ok()?;
     let info: Value = serde_json::from_reader(file.take(16384)).ok()?;
     let version = info["version"].as_str()?;
