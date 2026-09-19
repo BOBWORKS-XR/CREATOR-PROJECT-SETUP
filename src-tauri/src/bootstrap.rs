@@ -349,9 +349,9 @@ fn require_editor_closed(executable: &Path) -> Result<(), String> {
                 .is_some_and(|n| n == "Unity" || n == "Unity.exe");
             if is_unity {
                 let matches = target == executable
-                    || canonical_target.as_ref().is_some_and(|t| {
-                        fs::canonicalize(&target).ok().as_ref() == Some(t)
-                    });
+                    || canonical_target
+                        .as_ref()
+                        .is_some_and(|t| fs::canonicalize(&target).ok().as_ref() == Some(t));
                 if matches {
                     return Err(format!(
                         "Unity {EDITOR_VERSION} is running. Save your work and close its Editor windows before adding modules. Nothing was force-closed."
@@ -888,7 +888,14 @@ fn ensure_inner(
             crate::hub_installer::install(&logs, &emit)?;
             #[cfg(not(windows))]
             {
-                run_cli(&helper, &strings(&["hub", "install"]), "hub-install", &logs, false, &emit)?;
+                run_cli(
+                    &helper,
+                    &strings(&["hub", "install"]),
+                    "hub-install",
+                    &logs,
+                    false,
+                    &emit,
+                )?;
             }
             if !logic::probe_environment().hub_installed {
                 return Err("Unity Hub did not appear after installation. Check local logs before retrying.".into());

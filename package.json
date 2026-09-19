@@ -8,6 +8,7 @@
     "dev": "tauri dev",
     "build": "tauri build",
     "check": "cargo test --release --manifest-path src-tauri/Cargo.toml",
+    "test:scripts": "node --test scripts/release-checksums.test.mjs scripts/verify-windows-candidate.test.cjs",
     "test:ui": "playwright test"
   },
   "devDependencies": {

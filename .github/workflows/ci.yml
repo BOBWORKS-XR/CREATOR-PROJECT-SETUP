@@ -2,11 +2,16 @@ name: CI
 
 on:
   push:
-    branches: ["master"]
+    branches: ["master", "workflow*"]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   frontend:
+    name: Frontend & script tests
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v6
@@ -15,15 +20,32 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm run test:scripts
       - run: npx playwright install --with-deps chromium
       - run: npm run test:ui
-  rust:
-    name: Rust tests (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-latest, macos-15-intel, ubuntu-22.04]
-    runs-on: ${{ matrix.os }}
+
+  setup-windows:
+    name: Setup (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - run: npm run check
+      - name: Build Windows release binary and NSIS bundle
+        run: npm run build -- --bundles nsis
+
+  setup-linux:
+    name: Setup (Linux)
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -35,7 +57,6 @@ jobs:
         with:
           workspaces: src-tauri
       - name: Install Linux Tauri dependencies
-        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -45,12 +66,41 @@ jobs:
             libssl-dev \
             librsvg2-dev \
             patchelf \
-            build-essential
+            build-essential \
+            file \
+            rpm
+      - run: npm ci
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - run: npm run check
+      - name: Build Linux AppImage, DEB, and RPM bundle
+        run: NO_STRIP=1 npm run build -- --bundles appimage,deb,rpm
+
+  setup-macos:
+    name: Setup (macOS ${{ matrix.label }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: Apple silicon
+          - os: macos-15-intel
+            label: Intel
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
       - run: npm ci
       - name: Use a canonical temporary path for macOS test fixtures
-        if: runner.os == 'macOS'
         shell: bash
         run: echo "TMPDIR=$(node -p "require('fs').realpathSync(require('os').tmpdir())")" >> "$GITHUB_ENV"
-      - run: npm run check
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
-      - run: npm run build -- --no-bundle
+      - run: npm run check
+      - name: Build macOS DMG bundle
+        run: npm run build -- --bundles dmg

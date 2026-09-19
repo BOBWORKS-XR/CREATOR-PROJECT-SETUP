@@ -58,7 +58,9 @@ mod unix {
         // Wait up to 5 seconds for processes to terminate
         let start = Instant::now();
         while start.elapsed() < Duration::from_secs(5) {
-            let any_alive = hub_pids.iter().any(|&pid| unsafe { libc::kill(pid, 0) == 0 });
+            let any_alive = hub_pids
+                .iter()
+                .any(|&pid| unsafe { libc::kill(pid, 0) == 0 });
             if !any_alive {
                 break;
             }
