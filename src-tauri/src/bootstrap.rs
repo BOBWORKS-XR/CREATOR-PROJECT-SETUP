@@ -17,8 +17,9 @@ const GIB: u64 = 1024 * MIB;
 const MAX_OUTPUT: usize = 4 * MIB as usize;
 const MAX_LOG: usize = 16 * MIB as usize;
 const MAX_LINE: usize = 64 * 1024;
-// Module ID from the pinned 6000.3.21f1 Windows release manifest, not a CLI alias.
+// IDs verified against the pinned 6000.3.21f1 release manifests for all hosts.
 const OPENJDK_MODULE: &str = "android-open-jdk-17.0.18+8";
+const WINDOWS_MONO_MODULE: &str = "windows-mono";
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -109,14 +110,30 @@ fn remember_root(root: &Path) -> Result<(), String> {
 }
 
 fn module_selection(editor: Option<&EditorInstallation>) -> Result<(Action, Vec<String>), String> {
+    module_selection_for(editor, std::env::consts::OS)
+}
+
+fn module_selection_for(
+    editor: Option<&EditorInstallation>,
+    host: &str,
+) -> Result<(Action, Vec<String>), String> {
+    let windows_is_module = match host {
+        "windows" => false,
+        "linux" | "macos" => true,
+        _ => return Err("Automatic Unity installation is not supported on this platform.".into()),
+    };
     let Some(editor) = editor else {
-        return Ok((Action::InstallEditor, vec!["android".into()]));
+        let mut modules = vec!["android".into()];
+        if windows_is_module {
+            modules.push(WINDOWS_MONO_MODULE.into());
+        }
+        return Ok((Action::InstallEditor, modules));
     };
     if editor.ready {
         return Ok((Action::None, vec![]));
     }
-    if !editor.windows_standalone || editor.urp_template.is_none() {
-        return Err("The existing Editor is incomplete: its built-in Windows support or URP template is missing. Setup will not overwrite this installation. Use Unity Hub to repair/reinstall this Editor, then check again.".into());
+    if editor.urp_template.is_none() || (!windows_is_module && !editor.windows_standalone) {
+        return Err("The existing Editor is incomplete: a built-in component or URP template is missing. Setup will not overwrite this installation. Use Unity Hub to repair/reinstall this Editor, then check again.".into());
     }
     let mut modules = Vec::new();
     if !editor.android_player {
@@ -128,6 +145,9 @@ fn module_selection(editor: Option<&EditorInstallation>) -> Result<(Action, Vec<
         if !editor.open_jdk {
             modules.push(OPENJDK_MODULE.into());
         }
+    }
+    if windows_is_module && !editor.windows_standalone {
+        modules.push(WINDOWS_MONO_MODULE.into());
     }
     Ok((Action::AddModules, modules))
 }
@@ -218,9 +238,30 @@ fn free_space(path: &Path) -> Result<u64, String> {
     Ok(available)
 }
 
-#[cfg(not(windows))]
+#[cfg(unix)]
+fn free_space(path: &Path) -> Result<u64, String> {
+    use std::ffi::CString;
+    use std::os::unix::ffi::OsStrExt;
+    let mut existing = path;
+    while !existing.exists() {
+        existing = existing.parent().ok_or("Cannot find the install volume.")?;
+    }
+    let c_path = CString::new(existing.as_os_str().as_bytes())
+        .map_err(|_| "Invalid path for free space check.")?;
+    let mut stat: libc::statvfs = unsafe { std::mem::zeroed() };
+    if unsafe { libc::statvfs(c_path.as_ptr(), &mut stat) } == 0 {
+        Ok((stat.f_bavail as u64).saturating_mul(stat.f_frsize as u64))
+    } else {
+        Err(format!(
+            "Cannot check free space at {}. Nothing was installed.",
+            existing.display()
+        ))
+    }
+}
+
+#[cfg(not(any(windows, unix)))]
 fn free_space(_: &Path) -> Result<u64, String> {
-    Err("Automatic Unity installation is currently Windows-only.".into())
+    Err("Automatic Unity installation is not supported on this platform.".into())
 }
 
 fn check_space(plan: &Plan, project_parent: &Path) -> Result<(), String> {
@@ -309,9 +350,14 @@ fn require_editor_closed(executable: &Path) -> Result<(), String> {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn require_editor_closed(executable: &Path) -> Result<(), String> {
+    crate::unix_editors::require_closed(executable)
+}
+
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 fn require_editor_closed(_: &Path) -> Result<(), String> {
-    Err("Automatic installation is Windows-only.".into())
+    Err("Automatic installation is not supported on this platform.".into())
 }
 
 fn compact(value: &str) -> String {
@@ -621,6 +667,31 @@ pub fn licence_ready(emit: impl Fn(Progress)) -> Result<bool, String> {
     )?)
 }
 
+fn editor_root_for(executable: &Path, host: &str) -> Result<PathBuf, String> {
+    let suffix = match host {
+        "windows" => Path::new("Editor/Unity.exe"),
+        "linux" => Path::new("Editor/Unity"),
+        "macos" => Path::new("Unity.app/Contents/MacOS/Unity"),
+        _ => return Err("Unsupported Unity Editor platform.".into()),
+    };
+    if !executable.ends_with(suffix) {
+        return Err("Unexpected Unity Editor path.".into());
+    }
+    executable
+        .ancestors()
+        .nth(suffix.components().count())
+        .map(Path::to_path_buf)
+        .ok_or("Unexpected Unity Editor path.".into())
+}
+
+fn registered_executable(location: PathBuf, host: &str) -> PathBuf {
+    if host == "macos" && location.ends_with("Unity.app") {
+        location.join("Contents/MacOS/Unity")
+    } else {
+        location
+    }
+}
+
 fn registered_editor(data: &Value) -> Result<Option<EditorInstallation>, String> {
     let editors = data
         .as_array()
@@ -635,12 +706,9 @@ fn registered_editor(data: &Value) -> Result<Option<EditorInstallation>, String>
     let Some(entry) = matches.first() else {
         return Ok(None);
     };
-    let executable = absolute_path(entry, "location")?;
-    let root = executable
-        .parent()
-        .and_then(Path::parent)
-        .ok_or("Unexpected Unity Editor path.")?;
-    let editor = logic::inspect_editor(root.to_path_buf()).ok_or("The registered Editor is missing or incomplete. Review its installation in Unity Hub before retrying.")?;
+    let executable = registered_executable(absolute_path(entry, "location")?, std::env::consts::OS);
+    let root = editor_root_for(&executable, std::env::consts::OS)?;
+    let editor = logic::inspect_editor(root).ok_or("The registered Editor is missing or incomplete. Review its installation in Unity Hub before retrying.")?;
     if !editor.exact_recipe || Path::new(&editor.executable) != executable {
         return Err("Unity's registered Editor location does not match the pinned recipe.".into());
     }
@@ -711,13 +779,10 @@ fn ensure_inner(
     let target = logic::creation_target(request)?;
     let initial = logic::probe_environment();
     if can_reuse(initial.ready, initial.hub_installed, require_hub) {
-        if cfg!(windows) && free_space(target.parent().unwrap())? < 8 * GIB {
+        if free_space(target.parent().unwrap())? < 8 * GIB {
             return Err("Project creation needs an 8 GiB free-space reserve for package downloads and imports. Choose a location with more space before starting.".into());
         }
         return Ok(());
-    }
-    if !cfg!(windows) {
-        return Err("Automatic prerequisite installation is currently Windows-only. Install the listed requirements through Unity Hub, then create your project.".into());
     }
     let logs = dirs::data_local_dir()
         .ok_or("Local application data is unavailable.")?
@@ -822,12 +887,27 @@ fn ensure_inner(
         if plan.install_hub {
             emit(progress(
                 "Installing Unity Hub",
-                "Downloading the official signed installer. Windows may ask for approval.",
+                if cfg!(windows) {
+                    "Downloading the official signed installer. Windows may ask for approval."
+                } else {
+                    "Installing Unity Hub via the official Unity CLI."
+                },
             ));
             #[cfg(windows)]
             crate::hub_installer::install(&logs, &emit)?;
+            #[cfg(not(windows))]
+            {
+                run_cli(
+                    &helper,
+                    &strings(&["hub", "install"]),
+                    "hub-install",
+                    &logs,
+                    false,
+                    &emit,
+                )?;
+            }
             if !logic::probe_environment().hub_installed {
-                return Err("Unity Hub did not appear after installation. Check the Windows installer and local logs before retrying.".into());
+                return Err("Unity Hub did not appear after installation. Check local logs before retrying.".into());
             }
         }
         if plan.action != Action::None {
@@ -859,6 +939,11 @@ fn ensure_inner(
         ));
         let installed = logic::inspect_editor(plan.editor_root.clone())
             .ok_or("The required Editor executable is still missing after installation.")?;
+        fs::write(
+            logs.join("installed-requirements.json"),
+            serde_json::to_vec_pretty(&installed).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| format!("Cannot record installed requirement checks: {e}"))?;
         if !installed.ready {
             return Err("Unity finished, but one or more required components are still missing. No project was created. Recheck before retrying; inspect the requirement logs.".into());
         }
@@ -1094,14 +1179,12 @@ mod tests {
     }
 
     #[test]
-    #[cfg(windows)]
-    #[ignore = "installs Unity on an explicitly approved disposable Windows Actions runner only"]
+    #[ignore = "installs Unity on an explicitly approved disposable Actions runner only"]
     fn disposable_install_smoke() {
         for (key, value) in [
             ("GITHUB_ACTIONS", "true"),
             ("CI", "true"),
             ("RUNNER_ENVIRONMENT", "github-hosted"),
-            ("RUNNER_OS", "Windows"),
             ("CREATOR_SETUP_ACCEPT_TEST_LICENSES", "true"),
         ] {
             assert_eq!(
@@ -1110,11 +1193,16 @@ mod tests {
                 "Disposable installation requires explicit CI licence approval"
             );
         }
-        let environment = logic::probe_environment();
-        assert!(
-            !environment.hub_installed,
-            "This must be a clean runner, not the user's computer"
+        assert_eq!(
+            std::env::var("RUNNER_OS").as_deref(),
+            Ok(match std::env::consts::OS {
+                "windows" => "Windows",
+                "linux" => "Linux",
+                "macos" => "macOS",
+                _ => panic!("Unsupported installation test host"),
+            })
         );
+        let environment = logic::probe_environment();
         assert!(
             environment.editors.is_empty(),
             "This test requires no existing Editor"
@@ -1125,6 +1213,9 @@ mod tests {
             parent_directory: parent.to_string_lossy().into(),
         };
         let mut report = json!({"setupVersion":env!("CARGO_PKG_VERSION"), "editorVersion":EDITOR_VERSION,"prerequisitesVerified":false,"cancellationVerified":false,"existingInstallReused":false,"missingJdkRepaired":false,"activationHandoffRequired":false,"completed":false,"projectCreated":false,"unityAccountUsed":false,"licenseActivationTested":false});
+        report["platform"] = json!(std::env::consts::OS);
+        report["architecture"] = json!(std::env::consts::ARCH);
+        report["hubInitiallyInstalled"] = json!(environment.hub_installed);
         let checkpoint = |value: &Value| {
             fs::write(
                 parent.join("creator-prerequisite-acceptance.json"),
@@ -1139,7 +1230,10 @@ mod tests {
             cancelled.contains("cancelled before installation"),
             "Preflight did not reach cancellation: {cancelled}"
         );
-        assert!(!logic::probe_environment().hub_installed);
+        assert_eq!(
+            logic::probe_environment().hub_installed,
+            environment.hub_installed
+        );
         assert!(logic::probe_environment().editors.is_empty());
         assert!(!parent.join(&request.project_name).exists());
         report["cancellationVerified"] = json!(true);
@@ -1176,7 +1270,12 @@ mod tests {
             .find(|e| e.exact_recipe)
             .unwrap();
         let root = fs::canonicalize(&installed.root).unwrap();
-        let java = root.join("Editor/Data/PlaybackEngines/AndroidPlayer/OpenJDK/bin/java.exe");
+        let android = logic::playback_engines(&root).join("AndroidPlayer");
+        let java = android.join(if cfg!(windows) {
+            "OpenJDK/bin/java.exe"
+        } else {
+            "OpenJDK/bin/java"
+        });
         assert!(fs::canonicalize(&java).unwrap().starts_with(&root));
         fs::remove_file(&java).unwrap();
         assert!(!logic::probe_environment().ready);
@@ -1201,24 +1300,46 @@ mod tests {
         checkpoint(&report);
         let mut tool_versions = serde_json::Map::new();
         for (relative, arg) in [
-            ("OpenJDK/bin/java.exe", "-version"),
-            ("OpenJDK/bin/javac.exe", "-version"),
-            ("SDK/platform-tools/adb.exe", "version"),
             (
-                "NDK/toolchains/llvm/prebuilt/windows-x86_64/bin/clang.exe",
+                if cfg!(windows) {
+                    "OpenJDK/bin/java.exe"
+                } else {
+                    "OpenJDK/bin/java"
+                },
+                "-version",
+            ),
+            (
+                if cfg!(windows) {
+                    "OpenJDK/bin/javac.exe"
+                } else {
+                    "OpenJDK/bin/javac"
+                },
+                "-version",
+            ),
+            (
+                if cfg!(windows) {
+                    "SDK/platform-tools/adb.exe"
+                } else {
+                    "SDK/platform-tools/adb"
+                },
+                "version",
+            ),
+            (
+                match std::env::consts::OS {
+                    "windows" => "NDK/toolchains/llvm/prebuilt/windows-x86_64/bin/clang.exe",
+                    "macos" => "NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang",
+                    _ => "NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang",
+                },
                 "--version",
             ),
         ] {
-            use std::os::windows::process::CommandExt;
-            let executable = root
-                .join("Editor/Data/PlaybackEngines/AndroidPlayer")
-                .join(relative);
-            let output = Command::new(executable)
-                .arg(arg)
-                .creation_flags(0x08000000)
-                .stdin(Stdio::null())
-                .output()
-                .unwrap();
+            let mut command = Command::new(android.join(relative));
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                command.creation_flags(0x08000000);
+            }
+            let output = command.arg(arg).stdin(Stdio::null()).output().unwrap();
             assert!(
                 output.status.success(),
                 "Installed tool cannot run: {relative}"
@@ -1263,7 +1384,7 @@ mod tests {
     #[test]
     fn plans_only_the_missing_android_requirements() {
         assert_eq!(
-            module_selection(None).unwrap(),
+            module_selection_for(None, "windows").unwrap(),
             (Action::InstallEditor, vec!["android".into()])
         );
         let mut e = editor();
@@ -1287,7 +1408,108 @@ mod tests {
         assert!(module_selection(Some(&e)).is_err());
         e.urp_template = Some("x".into());
         e.windows_standalone = false;
-        assert!(module_selection(Some(&e)).is_err());
+        assert!(module_selection_for(Some(&e), "windows").is_err());
+    }
+    #[test]
+    fn unix_hosts_install_and_repair_windows_cross_build_support() {
+        for host in ["linux", "macos"] {
+            assert_eq!(
+                module_selection_for(None, host).unwrap(),
+                (
+                    Action::InstallEditor,
+                    vec!["android".into(), WINDOWS_MONO_MODULE.into()]
+                )
+            );
+            let mut e = editor();
+            assert_eq!(
+                module_selection_for(Some(&e), host).unwrap().0,
+                Action::None
+            );
+            e.ready = false;
+            e.windows_standalone = false;
+            assert_eq!(
+                module_selection_for(Some(&e), host).unwrap(),
+                (Action::AddModules, vec![WINDOWS_MONO_MODULE.into()])
+            );
+            e.open_jdk = false;
+            assert_eq!(
+                module_selection_for(Some(&e), host).unwrap().1,
+                vec![OPENJDK_MODULE, WINDOWS_MONO_MODULE]
+            );
+            e.android_player = false;
+            assert_eq!(
+                module_selection_for(Some(&e), host).unwrap().1,
+                vec!["android", WINDOWS_MONO_MODULE]
+            );
+            e.urp_template = None;
+            assert!(module_selection_for(Some(&e), host).is_err());
+        }
+        assert!(module_selection_for(None, "unknown").is_err());
+    }
+    #[test]
+    fn registered_editor_roots_follow_the_host_bundle_layout() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join(EDITOR_VERSION);
+        for (host, suffix) in [
+            ("windows", "Editor/Unity.exe"),
+            ("linux", "Editor/Unity"),
+            ("macos", "Unity.app/Contents/MacOS/Unity"),
+        ] {
+            assert_eq!(editor_root_for(&root.join(suffix), host).unwrap(), root);
+            assert!(editor_root_for(&root.join("Other/Unity"), host).is_err());
+        }
+        assert!(editor_root_for(&root.join("Editor/Unity"), "unknown").is_err());
+        let bundle = root.join("Unity.app");
+        let executable = bundle.join("Contents/MacOS/Unity");
+        assert_eq!(registered_executable(bundle.clone(), "macos"), executable);
+        assert_eq!(
+            registered_executable(executable.clone(), "macos"),
+            executable
+        );
+        assert_eq!(registered_executable(bundle.clone(), "linux"), bundle);
+        assert_eq!(
+            editor_root_for(
+                &registered_executable(root.join("Unity.app"), "macos"),
+                "macos"
+            )
+            .unwrap(),
+            root
+        );
+    }
+    #[test]
+    #[ignore = "downloads the pinned Unity CLI and queries its dry-run plan on a disposable hosted runner"]
+    fn disposable_preview_smoke() {
+        for (key, value) in [
+            ("GITHUB_ACTIONS", "true"),
+            ("CI", "true"),
+            ("RUNNER_ENVIRONMENT", "github-hosted"),
+        ] {
+            assert_eq!(std::env::var(key).as_deref(), Ok(value));
+        }
+        let logs = tempfile::tempdir().unwrap();
+        let helper = crate::hub::prepare_helper(&|_| {}).unwrap();
+        let (action, modules) = module_selection(None).unwrap();
+        let args = arguments(&action, &modules, true);
+        assert!(args.iter().any(|arg| arg == "--dry-run"));
+        assert!(!args.iter().any(|arg| arg == "--accept-eula"));
+        let preview = run_cli(&helper, &args, "preview", logs.path(), true, &|_| {}).unwrap();
+        assert_eq!(preview["editor"]["version"], EDITOR_VERSION);
+        assert!(!preview["alreadyInstalled"].as_bool().unwrap());
+        assert!(preview_size(&preview).unwrap() > GIB);
+        let planned = preview["modules"].as_array().unwrap();
+        for required in ["android", OPENJDK_MODULE, "android-ndk-r27c"] {
+            assert!(
+                planned.iter().any(|module| module["id"] == required),
+                "Missing {required}"
+            );
+        }
+        if !cfg!(windows) {
+            assert!(planned
+                .iter()
+                .any(|module| module["id"] == WINDOWS_MONO_MODULE));
+        }
+        println!("Verified pinned CLI dry-run on {} {}: {} bytes; no Editor installed or licences accepted.",
+            std::env::consts::OS, std::env::consts::ARCH, preview_size(&preview).unwrap());
     }
     #[test]
     fn preview_never_accepts_licences_or_forces_installation() {
@@ -1405,7 +1627,7 @@ mod tests {
             install_hub: false,
             editor_root: temp.path().join(EDITOR_VERSION),
             cache_root: temp.path().join("cache"),
-            modules: vec!["android".into()],
+            modules: module_selection(None).unwrap().1,
             download_bytes: 1,
             reserve_bytes: 1,
             log_directory: temp.path().into(),
@@ -1417,5 +1639,26 @@ mod tests {
         assert!(check_plan_current(&plan, &changed, &json!([])).is_err());
         fs::create_dir(&plan.editor_root).unwrap();
         assert!(check_plan_current(&plan, &paths, &json!([])).is_err());
+    }
+
+    #[test]
+    fn free_space_returns_valid_measurement_for_existing_directory() {
+        let temp = tempfile::tempdir().unwrap();
+        let bytes = free_space(temp.path()).unwrap();
+        assert!(bytes > 0);
+    }
+
+    #[test]
+    fn require_editor_closed_allows_when_no_matching_editor_runs() {
+        let temp = tempfile::tempdir().unwrap();
+        let dummy = temp.path().join("Unity");
+        fs::write(&dummy, b"fixture").unwrap();
+        assert!(require_editor_closed(&dummy).is_ok());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn missing_editor_cannot_authorize_module_installation() {
+        assert!(require_editor_closed(Path::new("/nonexistent/Unity")).is_err());
     }
 }

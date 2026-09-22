@@ -184,6 +184,9 @@ fn hub_candidates() -> Vec<PathBuf> {
             PathBuf::from("/usr/bin/unityhub-bin"),
             PathBuf::from("/opt/unityhub/unityhub"),
         ]);
+        if let Some(home) = dirs::home_dir() {
+            paths.push(home.join("Applications/UnityHub.AppImage"));
+        }
     }
     paths
 }
@@ -219,11 +222,24 @@ fn executable_for(root: &Path) -> PathBuf {
     }
 }
 
-fn editor_data(root: &Path) -> PathBuf {
+pub(crate) fn editor_data(root: &Path) -> PathBuf {
     if cfg!(target_os = "macos") {
         root.join("Unity.app/Contents")
     } else {
         root.join("Editor/Data")
+    }
+}
+
+pub(crate) fn playback_engines(root: &Path) -> PathBuf {
+    playback_engines_for(root, std::env::consts::OS)
+}
+
+fn playback_engines_for(root: &Path, host: &str) -> PathBuf {
+    // macOS module packages live beside Unity.app, not inside its bundle.
+    if host == "macos" {
+        root.join("PlaybackEngines")
+    } else {
+        root.join("Editor/Data/PlaybackEngines")
     }
 }
 
@@ -303,7 +319,7 @@ pub(crate) fn inspect_editor(root: PathBuf) -> Option<EditorInstallation> {
     if !executable.is_file() {
         return None;
     }
-    let playback = editor_data(&root).join("PlaybackEngines");
+    let playback = playback_engines(&root);
     let android = find_case_insensitive_child(&playback, "AndroidPlayer");
     let windows = find_case_insensitive_child(&playback, "WindowsStandaloneSupport");
     let android_sdk = android.as_ref().is_some_and(|path| {
@@ -1002,13 +1018,37 @@ mod tests {
     const PACKAGE_RESET_LOG: &str = include_str!("../../tests/fixtures/unity-package-reset.txt");
 
     #[test]
+    fn module_locations_match_native_installation_layouts() {
+        let root = Path::new("fixture");
+        assert_eq!(
+            playback_engines_for(root, "macos"),
+            root.join("PlaybackEngines")
+        );
+        for host in ["windows", "linux"] {
+            assert_eq!(
+                playback_engines_for(root, host),
+                root.join("Editor/Data/PlaybackEngines")
+            );
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn hub_candidates_include_verified_cli_appimage_destination() {
+        let expected = dirs::home_dir()
+            .unwrap()
+            .join("Applications/UnityHub.AppImage");
+        assert!(hub_candidates().contains(&expected));
+    }
+
+    #[test]
     fn empty_android_directories_are_not_installed_tools() {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().join(EDITOR_VERSION);
         let executable = executable_for(&root);
         fs::create_dir_all(executable.parent().unwrap()).unwrap();
         fs::write(&executable, "fixture").unwrap();
-        let android = editor_data(&root).join("PlaybackEngines/AndroidPlayer");
+        let android = playback_engines(&root).join("AndroidPlayer");
         for child in ["SDK", "NDK", "OpenJDK"] {
             fs::create_dir_all(android.join(child)).unwrap();
         }

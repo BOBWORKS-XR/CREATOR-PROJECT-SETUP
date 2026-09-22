@@ -75,9 +75,10 @@ function updateControls() {
     document.querySelector('#summary-path').textContent = createdProject || elements.parentFolder.value;
   }
   for (const field of [elements.projectName, elements.parentFolder, elements.browse]) field.disabled = locked;
-  elements.create.disabled = locked || !environment || (!environment.ready && environment.platform !== 'windows');
-  elements.create.textContent = environment && !environment.ready && environment.platform === 'windows' ? 'Set up and create project' : 'Create and validate project';
-  document.querySelector('#requirements-consent').classList.toggle('hidden', !environment || (environment.ready && environment.hubInstalled) || environment.platform !== 'windows');
+  const canBootstrap = environment && (environment.platform === 'windows' || environment.platform === 'linux');
+  elements.create.disabled = locked || !environment || (!environment.ready && !canBootstrap);
+  elements.create.textContent = environment && !environment.ready && canBootstrap ? 'Set up and create project' : 'Create and validate project';
+  document.querySelector('#requirements-consent').classList.toggle('hidden', !environment || (environment.ready && environment.hubInstalled) || !canBootstrap);
   elements.create.classList.toggle('hidden', Boolean(createdProject));
   elements.openProject.classList.toggle('hidden', !createdProject);
   elements.openProject.disabled = opening;
@@ -212,7 +213,8 @@ function renderTransfer(transfer) {
 }
 
 elements.create.addEventListener('click', async () => {
-  if (mode !== 'new' || busy || inspecting || checking || createdProject || !environment || (!environment.ready && environment.platform !== 'windows')) return;
+  const canBootstrap = environment && (environment.platform === 'windows' || environment.platform === 'linux');
+  if (mode !== 'new' || busy || inspecting || checking || createdProject || !environment || (!environment.ready && !canBootstrap)) return;
   busy = true;
   creating = true;
   updateControls();
@@ -320,8 +322,9 @@ function renderHubResult(result) {
   element.textContent = result?.message || 'Hub registration has not been verified. Your project is ready to open.';
   retryHub.classList.toggle('hidden', Boolean(result?.registered));
   retryHub.textContent = result?.requiresHubUpdate ? 'Recheck Hub and add project' : 'Retry adding to Unity Hub';
-  restartHub.classList.toggle('hidden', !result?.registered || !result?.refreshPending || environment?.platform?.toLowerCase() !== 'windows');
-  if (result?.registered && result?.refreshPending && environment?.platform?.toLowerCase() !== 'windows') {
+  const canRestartHub = environment && (environment.platform === 'windows' || environment.platform === 'linux');
+  restartHub.classList.toggle('hidden', !result?.registered || !result?.refreshPending || !canRestartHub);
+  if (result?.registered && result?.refreshPending && !canRestartHub) {
     element.textContent += ' Fully quit Hub, then choose Open Unity Hub.';
   }
   document.querySelector('#open-result-hub-button').classList.toggle('hidden', !environment?.hubInstalled);

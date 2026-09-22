@@ -6,7 +6,7 @@ pub fn restart(executable: &Path) -> Result<(), String> {
     #[cfg(not(windows))]
     {
         let _ = executable;
-        Err("Fully quit Unity Hub, then choose Open Unity Hub. Automatic restart is currently available on Windows only.".into())
+        Err("Fully quit Unity Hub, then choose Open Unity Hub. Automatic restart is not supported on this platform.".into())
     }
 }
 
