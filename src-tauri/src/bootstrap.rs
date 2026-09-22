@@ -684,6 +684,14 @@ fn editor_root_for(executable: &Path, host: &str) -> Result<PathBuf, String> {
         .ok_or("Unexpected Unity Editor path.".into())
 }
 
+fn registered_executable(location: PathBuf, host: &str) -> PathBuf {
+    if host == "macos" && location.ends_with("Unity.app") {
+        location.join("Contents/MacOS/Unity")
+    } else {
+        location
+    }
+}
+
 fn registered_editor(data: &Value) -> Result<Option<EditorInstallation>, String> {
     let editors = data
         .as_array()
@@ -698,7 +706,7 @@ fn registered_editor(data: &Value) -> Result<Option<EditorInstallation>, String>
     let Some(entry) = matches.first() else {
         return Ok(None);
     };
-    let executable = absolute_path(entry, "location")?;
+    let executable = registered_executable(absolute_path(entry, "location")?, std::env::consts::OS);
     let root = editor_root_for(&executable, std::env::consts::OS)?;
     let editor = logic::inspect_editor(root).ok_or("The registered Editor is missing or incomplete. Review its installation in Unity Hub before retrying.")?;
     if !editor.exact_recipe || Path::new(&editor.executable) != executable {
@@ -1451,6 +1459,22 @@ mod tests {
             assert!(editor_root_for(&root.join("Other/Unity"), host).is_err());
         }
         assert!(editor_root_for(&root.join("Editor/Unity"), "unknown").is_err());
+        let bundle = root.join("Unity.app");
+        let executable = bundle.join("Contents/MacOS/Unity");
+        assert_eq!(registered_executable(bundle.clone(), "macos"), executable);
+        assert_eq!(
+            registered_executable(executable.clone(), "macos"),
+            executable
+        );
+        assert_eq!(registered_executable(bundle.clone(), "linux"), bundle);
+        assert_eq!(
+            editor_root_for(
+                &registered_executable(root.join("Unity.app"), "macos"),
+                "macos"
+            )
+            .unwrap(),
+            root
+        );
     }
     #[test]
     #[ignore = "downloads the pinned Unity CLI and queries its dry-run plan on a disposable hosted runner"]

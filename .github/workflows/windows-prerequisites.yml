@@ -11,7 +11,7 @@ on:
       platforms:
         description: Disposable installation hosts
         type: choice
-        options: [windows, native, linux, all]
+        options: [windows, native, linux, macos, all]
         default: windows
 
 permissions:
@@ -151,7 +151,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.platforms == 'linux' && '[{"os":"ubuntu-22.04","label":"Linux x64"}]' || '[{"os":"ubuntu-22.04","label":"Linux x64"},{"os":"macos-latest","label":"macOS Apple silicon"},{"os":"macos-15-intel","label":"macOS Intel"}]') }}
+        include: ${{ fromJSON(inputs.platforms == 'linux' && '[{"os":"ubuntu-22.04","label":"Linux x64"}]' || inputs.platforms == 'macos' && '[{"os":"macos-latest","label":"macOS Apple silicon"},{"os":"macos-15-intel","label":"macOS Intel"}]' || '[{"os":"ubuntu-22.04","label":"Linux x64"},{"os":"macos-latest","label":"macOS Apple silicon"},{"os":"macos-15-intel","label":"macOS Intel"}]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     steps:
