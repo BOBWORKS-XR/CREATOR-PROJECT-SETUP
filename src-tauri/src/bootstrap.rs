@@ -667,6 +667,23 @@ pub fn licence_ready(emit: impl Fn(Progress)) -> Result<bool, String> {
     )?)
 }
 
+fn editor_root_for(executable: &Path, host: &str) -> Result<PathBuf, String> {
+    let suffix = match host {
+        "windows" => Path::new("Editor/Unity.exe"),
+        "linux" => Path::new("Editor/Unity"),
+        "macos" => Path::new("Unity.app/Contents/MacOS/Unity"),
+        _ => return Err("Unsupported Unity Editor platform.".into()),
+    };
+    if !executable.ends_with(suffix) {
+        return Err("Unexpected Unity Editor path.".into());
+    }
+    executable
+        .ancestors()
+        .nth(suffix.components().count())
+        .map(Path::to_path_buf)
+        .ok_or("Unexpected Unity Editor path.".into())
+}
+
 fn registered_editor(data: &Value) -> Result<Option<EditorInstallation>, String> {
     let editors = data
         .as_array()
@@ -682,11 +699,8 @@ fn registered_editor(data: &Value) -> Result<Option<EditorInstallation>, String>
         return Ok(None);
     };
     let executable = absolute_path(entry, "location")?;
-    let root = executable
-        .parent()
-        .and_then(Path::parent)
-        .ok_or("Unexpected Unity Editor path.")?;
-    let editor = logic::inspect_editor(root.to_path_buf()).ok_or("The registered Editor is missing or incomplete. Review its installation in Unity Hub before retrying.")?;
+    let root = editor_root_for(&executable, std::env::consts::OS)?;
+    let editor = logic::inspect_editor(root).ok_or("The registered Editor is missing or incomplete. Review its installation in Unity Hub before retrying.")?;
     if !editor.exact_recipe || Path::new(&editor.executable) != executable {
         return Err("Unity's registered Editor location does not match the pinned recipe.".into());
     }
@@ -1384,6 +1398,55 @@ mod tests {
         assert!(module_selection_for(None, "unknown").is_err());
     }
     #[test]
+    fn registered_editor_roots_follow_the_host_bundle_layout() {
+        let temp = tempfile::tempdir().unwrap();
+        let root = temp.path().join(EDITOR_VERSION);
+        for (host, suffix) in [
+            ("windows", "Editor/Unity.exe"),
+            ("linux", "Editor/Unity"),
+            ("macos", "Unity.app/Contents/MacOS/Unity"),
+        ] {
+            assert_eq!(editor_root_for(&root.join(suffix), host).unwrap(), root);
+            assert!(editor_root_for(&root.join("Other/Unity"), host).is_err());
+        }
+        assert!(editor_root_for(&root.join("Editor/Unity"), "unknown").is_err());
+    }
+    #[test]
+    #[ignore = "downloads the pinned Unity CLI and queries its dry-run plan on a disposable hosted runner"]
+    fn disposable_preview_smoke() {
+        for (key, value) in [
+            ("GITHUB_ACTIONS", "true"),
+            ("CI", "true"),
+            ("RUNNER_ENVIRONMENT", "github-hosted"),
+        ] {
+            assert_eq!(std::env::var(key).as_deref(), Ok(value));
+        }
+        let logs = tempfile::tempdir().unwrap();
+        let helper = crate::hub::prepare_helper(&|_| {}).unwrap();
+        let (action, modules) = module_selection(None).unwrap();
+        let args = arguments(&action, &modules, true);
+        assert!(args.iter().any(|arg| arg == "--dry-run"));
+        assert!(!args.iter().any(|arg| arg == "--accept-eula"));
+        let preview = run_cli(&helper, &args, "preview", logs.path(), true, &|_| {}).unwrap();
+        assert_eq!(preview["editor"]["version"], EDITOR_VERSION);
+        assert!(!preview["alreadyInstalled"].as_bool().unwrap());
+        assert!(preview_size(&preview).unwrap() > GIB);
+        let planned = preview["modules"].as_array().unwrap();
+        for required in ["android", OPENJDK_MODULE, "android-ndk-r27c"] {
+            assert!(
+                planned.iter().any(|module| module["id"] == required),
+                "Missing {required}"
+            );
+        }
+        if !cfg!(windows) {
+            assert!(planned
+                .iter()
+                .any(|module| module["id"] == WINDOWS_MONO_MODULE));
+        }
+        println!("Verified pinned CLI dry-run on {} {}: {} bytes; no Editor installed or licences accepted.",
+            std::env::consts::OS, std::env::consts::ARCH, preview_size(&preview).unwrap());
+    }
+    #[test]
     fn preview_never_accepts_licences_or_forces_installation() {
         for action in [Action::InstallEditor, Action::AddModules] {
             let args = arguments(&action, &["android".into()], true);
@@ -1499,7 +1562,7 @@ mod tests {
             install_hub: false,
             editor_root: temp.path().join(EDITOR_VERSION),
             cache_root: temp.path().join("cache"),
-            modules: vec!["android".into()],
+            modules: module_selection(None).unwrap().1,
             download_bytes: 1,
             reserve_bytes: 1,
             log_directory: temp.path().into(),
