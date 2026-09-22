@@ -184,6 +184,9 @@ fn hub_candidates() -> Vec<PathBuf> {
             PathBuf::from("/usr/bin/unityhub-bin"),
             PathBuf::from("/opt/unityhub/unityhub"),
         ]);
+        if let Some(home) = dirs::home_dir() {
+            paths.push(home.join("Applications/UnityHub.AppImage"));
+        }
     }
     paths
 }
@@ -1027,6 +1030,15 @@ mod tests {
                 root.join("Editor/Data/PlaybackEngines")
             );
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn hub_candidates_include_verified_cli_appimage_destination() {
+        let expected = dirs::home_dir()
+            .unwrap()
+            .join("Applications/UnityHub.AppImage");
+        assert!(hub_candidates().contains(&expected));
     }
 
     #[test]
