@@ -496,7 +496,17 @@ fn area(root: &Path, relative: &str) -> Result<PathBuf, String> {
     reject_links(&path)?;
     Ok(path)
 }
-fn operation(root: &Path) -> Result<fs::File, String> {
+struct OperationGuard(fs::File);
+
+impl Drop for OperationGuard {
+    fn drop(&mut self) {
+        // Explicitly release advisory locks before the file handle closes. macOS can
+        // otherwise retain a just-closed lock long enough to reject the next queue action.
+        let _ = fs2::FileExt::unlock(&self.0);
+    }
+}
+
+fn operation(root: &Path) -> Result<OperationGuard, String> {
     let path = area(root, "desktop.lock")?;
     fs::create_dir_all(path.parent().unwrap())
         .map_err(|_| "Could not create the plugin workspace.")?;
@@ -511,7 +521,7 @@ fn operation(root: &Path) -> Result<fs::File, String> {
     fs2::FileExt::try_lock_exclusive(&lock).map_err(|_| {
         "Another Creator app is changing this project's plugin queue. Try again after it finishes."
     })?;
-    Ok(lock)
+    Ok(OperationGuard(lock))
 }
 fn save_new(path: &Path, bytes: &[u8]) -> Result<(), String> {
     reject_links(path)?;
