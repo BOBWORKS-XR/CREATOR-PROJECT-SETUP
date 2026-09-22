@@ -12,7 +12,7 @@ jobs:
   package:
     # Accepted candidate releases must not be rebuilt or have their assets replaced.
     # Retain the stable exclusions.
-    if: ${{ github.ref_name != 'v0.3.0' && github.ref_name != 'v0.3.1' }}
+    if: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') && github.ref_name != 'v0.3.0' && github.ref_name != 'v0.3.1' }}
     name: Package ${{ matrix.label }}
     strategy:
       fail-fast: false
@@ -75,7 +75,7 @@ jobs:
           args: ${{ matrix.args }}
 
   checksums:
-    if: ${{ github.ref_name != 'v0.3.0' && github.ref_name != 'v0.3.1' }}
+    if: ${{ github.ref_type == 'tag' && startsWith(github.ref_name, 'v') && github.ref_name != 'v0.3.0' && github.ref_name != 'v0.3.1' }}
     name: Consolidate SHA256 checksums
     runs-on: ubuntu-latest
     needs: [package]

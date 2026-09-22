@@ -13,6 +13,8 @@ mod hub_restart;
 mod lifecycle;
 mod logic;
 mod repair;
+#[cfg(unix)]
+mod unix_editors;
 
 use logic::{CreateRequest, CreationResult, EnvironmentReport, Recipe};
 use tauri::{Emitter, Manager};

@@ -17,8 +17,9 @@ const GIB: u64 = 1024 * MIB;
 const MAX_OUTPUT: usize = 4 * MIB as usize;
 const MAX_LOG: usize = 16 * MIB as usize;
 const MAX_LINE: usize = 64 * 1024;
-// Module ID from the pinned 6000.3.21f1 Windows release manifest, not a CLI alias.
+// IDs verified against the pinned 6000.3.21f1 release manifests for all hosts.
 const OPENJDK_MODULE: &str = "android-open-jdk-17.0.18+8";
+const WINDOWS_MONO_MODULE: &str = "windows-mono";
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -109,14 +110,30 @@ fn remember_root(root: &Path) -> Result<(), String> {
 }
 
 fn module_selection(editor: Option<&EditorInstallation>) -> Result<(Action, Vec<String>), String> {
+    module_selection_for(editor, std::env::consts::OS)
+}
+
+fn module_selection_for(
+    editor: Option<&EditorInstallation>,
+    host: &str,
+) -> Result<(Action, Vec<String>), String> {
+    let windows_is_module = match host {
+        "windows" => false,
+        "linux" | "macos" => true,
+        _ => return Err("Automatic Unity installation is not supported on this platform.".into()),
+    };
     let Some(editor) = editor else {
-        return Ok((Action::InstallEditor, vec!["android".into()]));
+        let mut modules = vec!["android".into()];
+        if windows_is_module {
+            modules.push(WINDOWS_MONO_MODULE.into());
+        }
+        return Ok((Action::InstallEditor, modules));
     };
     if editor.ready {
         return Ok((Action::None, vec![]));
     }
-    if !editor.windows_standalone || editor.urp_template.is_none() {
-        return Err("The existing Editor is incomplete: its built-in Windows support or URP template is missing. Setup will not overwrite this installation. Use Unity Hub to repair/reinstall this Editor, then check again.".into());
+    if editor.urp_template.is_none() || (!windows_is_module && !editor.windows_standalone) {
+        return Err("The existing Editor is incomplete: a built-in component or URP template is missing. Setup will not overwrite this installation. Use Unity Hub to repair/reinstall this Editor, then check again.".into());
     }
     let mut modules = Vec::new();
     if !editor.android_player {
@@ -128,6 +145,9 @@ fn module_selection(editor: Option<&EditorInstallation>) -> Result<(Action, Vec<
         if !editor.open_jdk {
             modules.push(OPENJDK_MODULE.into());
         }
+    }
+    if windows_is_module && !editor.windows_standalone {
+        modules.push(WINDOWS_MONO_MODULE.into());
     }
     Ok((Action::AddModules, modules))
 }
@@ -330,42 +350,9 @@ fn require_editor_closed(executable: &Path) -> Result<(), String> {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn require_editor_closed(executable: &Path) -> Result<(), String> {
-    let canonical_target = fs::canonicalize(executable).ok();
-    let Ok(entries) = fs::read_dir("/proc") else {
-        return Ok(());
-    };
-    for entry in entries.flatten() {
-        let name = entry.file_name();
-        let name_str = name.to_string_lossy();
-        if !name_str.chars().all(|c| c.is_ascii_digit()) {
-            continue;
-        }
-        let exe_link = entry.path().join("exe");
-        if let Ok(target) = fs::read_link(&exe_link) {
-            let is_unity = target
-                .file_name()
-                .is_some_and(|n| n == "Unity" || n == "Unity.exe");
-            if is_unity {
-                let matches = target == executable
-                    || canonical_target
-                        .as_ref()
-                        .is_some_and(|t| fs::canonicalize(&target).ok().as_ref() == Some(t));
-                if matches {
-                    return Err(format!(
-                        "Unity {EDITOR_VERSION} is running. Save your work and close its Editor windows before adding modules. Nothing was force-closed."
-                    ));
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-#[cfg(target_os = "macos")]
-fn require_editor_closed(_: &Path) -> Result<(), String> {
-    Ok(())
+    crate::unix_editors::require_closed(executable)
 }
 
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
@@ -1334,7 +1321,7 @@ mod tests {
     #[test]
     fn plans_only_the_missing_android_requirements() {
         assert_eq!(
-            module_selection(None).unwrap(),
+            module_selection_for(None, "windows").unwrap(),
             (Action::InstallEditor, vec!["android".into()])
         );
         let mut e = editor();
@@ -1358,7 +1345,43 @@ mod tests {
         assert!(module_selection(Some(&e)).is_err());
         e.urp_template = Some("x".into());
         e.windows_standalone = false;
-        assert!(module_selection(Some(&e)).is_err());
+        assert!(module_selection_for(Some(&e), "windows").is_err());
+    }
+    #[test]
+    fn unix_hosts_install_and_repair_windows_cross_build_support() {
+        for host in ["linux", "macos"] {
+            assert_eq!(
+                module_selection_for(None, host).unwrap(),
+                (
+                    Action::InstallEditor,
+                    vec!["android".into(), WINDOWS_MONO_MODULE.into()]
+                )
+            );
+            let mut e = editor();
+            assert_eq!(
+                module_selection_for(Some(&e), host).unwrap().0,
+                Action::None
+            );
+            e.ready = false;
+            e.windows_standalone = false;
+            assert_eq!(
+                module_selection_for(Some(&e), host).unwrap(),
+                (Action::AddModules, vec![WINDOWS_MONO_MODULE.into()])
+            );
+            e.open_jdk = false;
+            assert_eq!(
+                module_selection_for(Some(&e), host).unwrap().1,
+                vec![OPENJDK_MODULE, WINDOWS_MONO_MODULE]
+            );
+            e.android_player = false;
+            assert_eq!(
+                module_selection_for(Some(&e), host).unwrap().1,
+                vec!["android", WINDOWS_MONO_MODULE]
+            );
+            e.urp_template = None;
+            assert!(module_selection_for(Some(&e), host).is_err());
+        }
+        assert!(module_selection_for(None, "unknown").is_err());
     }
     #[test]
     fn preview_never_accepts_licences_or_forces_installation() {
@@ -1501,6 +1524,13 @@ mod tests {
     fn require_editor_closed_allows_when_no_matching_editor_runs() {
         let temp = tempfile::tempdir().unwrap();
         let dummy = temp.path().join("Unity");
+        fs::write(&dummy, b"fixture").unwrap();
         assert!(require_editor_closed(&dummy).is_ok());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn missing_editor_cannot_authorize_module_installation() {
+        assert!(require_editor_closed(Path::new("/nonexistent/Unity")).is_err());
     }
 }
