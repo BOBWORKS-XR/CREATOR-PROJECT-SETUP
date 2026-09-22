@@ -11,19 +11,19 @@ on:
       platforms:
         description: Disposable installation hosts
         type: choice
-        options: [windows, native, all]
+        options: [windows, native, linux, all]
         default: windows
 
 permissions:
   contents: read
 
 concurrency:
-  group: setup-prerequisites-${{ github.ref }}
+  group: setup-prerequisites-${{ github.ref }}-${{ inputs.platforms }}
   cancel-in-progress: false
 
 jobs:
   clean-install:
-    if: github.repository == 'BOBWORKS-XR/CREATOR-PROJECT-SETUP' && inputs.platforms != 'native'
+    if: github.repository == 'BOBWORKS-XR/CREATOR-PROJECT-SETUP' && (inputs.platforms == 'windows' || inputs.platforms == 'all')
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
@@ -151,13 +151,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-22.04
-            label: Linux x64
-          - os: macos-latest
-            label: macOS Apple silicon
-          - os: macos-15-intel
-            label: macOS Intel
+        include: ${{ fromJSON(inputs.platforms == 'linux' && '[{"os":"ubuntu-22.04","label":"Linux x64"}]' || '[{"os":"ubuntu-22.04","label":"Linux x64"},{"os":"macos-latest","label":"macOS Apple silicon"},{"os":"macos-15-intel","label":"macOS Intel"}]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     steps:
