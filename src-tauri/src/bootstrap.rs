@@ -931,6 +931,11 @@ fn ensure_inner(
         ));
         let installed = logic::inspect_editor(plan.editor_root.clone())
             .ok_or("The required Editor executable is still missing after installation.")?;
+        fs::write(
+            logs.join("installed-requirements.json"),
+            serde_json::to_vec_pretty(&installed).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| format!("Cannot record installed requirement checks: {e}"))?;
         if !installed.ready {
             return Err("Unity finished, but one or more required components are still missing. No project was created. Recheck before retrying; inspect the requirement logs.".into());
         }
@@ -1257,7 +1262,7 @@ mod tests {
             .find(|e| e.exact_recipe)
             .unwrap();
         let root = fs::canonicalize(&installed.root).unwrap();
-        let android = logic::editor_data(&root).join("PlaybackEngines/AndroidPlayer");
+        let android = logic::playback_engines(&root).join("AndroidPlayer");
         let java = android.join(if cfg!(windows) {
             "OpenJDK/bin/java.exe"
         } else {

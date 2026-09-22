@@ -227,6 +227,19 @@ pub(crate) fn editor_data(root: &Path) -> PathBuf {
     }
 }
 
+pub(crate) fn playback_engines(root: &Path) -> PathBuf {
+    playback_engines_for(root, std::env::consts::OS)
+}
+
+fn playback_engines_for(root: &Path, host: &str) -> PathBuf {
+    // macOS module packages live beside Unity.app, not inside its bundle.
+    if host == "macos" {
+        root.join("PlaybackEngines")
+    } else {
+        root.join("Editor/Data/PlaybackEngines")
+    }
+}
+
 fn find_case_insensitive_child(parent: &Path, expected: &str) -> Option<PathBuf> {
     fs::read_dir(parent)
         .ok()?
@@ -303,7 +316,7 @@ pub(crate) fn inspect_editor(root: PathBuf) -> Option<EditorInstallation> {
     if !executable.is_file() {
         return None;
     }
-    let playback = editor_data(&root).join("PlaybackEngines");
+    let playback = playback_engines(&root);
     let android = find_case_insensitive_child(&playback, "AndroidPlayer");
     let windows = find_case_insensitive_child(&playback, "WindowsStandaloneSupport");
     let android_sdk = android.as_ref().is_some_and(|path| {
@@ -1002,13 +1015,28 @@ mod tests {
     const PACKAGE_RESET_LOG: &str = include_str!("../../tests/fixtures/unity-package-reset.txt");
 
     #[test]
+    fn module_locations_match_native_installation_layouts() {
+        let root = Path::new("fixture");
+        assert_eq!(
+            playback_engines_for(root, "macos"),
+            root.join("PlaybackEngines")
+        );
+        for host in ["windows", "linux"] {
+            assert_eq!(
+                playback_engines_for(root, host),
+                root.join("Editor/Data/PlaybackEngines")
+            );
+        }
+    }
+
+    #[test]
     fn empty_android_directories_are_not_installed_tools() {
         let temp = tempfile::tempdir().unwrap();
         let root = temp.path().join(EDITOR_VERSION);
         let executable = executable_for(&root);
         fs::create_dir_all(executable.parent().unwrap()).unwrap();
         fs::write(&executable, "fixture").unwrap();
-        let android = editor_data(&root).join("PlaybackEngines/AndroidPlayer");
+        let android = playback_engines(&root).join("AndroidPlayer");
         for child in ["SDK", "NDK", "OpenJDK"] {
             fs::create_dir_all(android.join(child)).unwrap();
         }
