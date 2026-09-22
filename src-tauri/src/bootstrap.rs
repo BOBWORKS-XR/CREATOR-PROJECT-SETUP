@@ -1166,14 +1166,12 @@ mod tests {
     }
 
     #[test]
-    #[cfg(windows)]
-    #[ignore = "installs Unity on an explicitly approved disposable Windows Actions runner only"]
+    #[ignore = "installs Unity on an explicitly approved disposable Actions runner only"]
     fn disposable_install_smoke() {
         for (key, value) in [
             ("GITHUB_ACTIONS", "true"),
             ("CI", "true"),
             ("RUNNER_ENVIRONMENT", "github-hosted"),
-            ("RUNNER_OS", "Windows"),
             ("CREATOR_SETUP_ACCEPT_TEST_LICENSES", "true"),
         ] {
             assert_eq!(
@@ -1182,11 +1180,16 @@ mod tests {
                 "Disposable installation requires explicit CI licence approval"
             );
         }
-        let environment = logic::probe_environment();
-        assert!(
-            !environment.hub_installed,
-            "This must be a clean runner, not the user's computer"
+        assert_eq!(
+            std::env::var("RUNNER_OS").as_deref(),
+            Ok(match std::env::consts::OS {
+                "windows" => "Windows",
+                "linux" => "Linux",
+                "macos" => "macOS",
+                _ => panic!("Unsupported installation test host"),
+            })
         );
+        let environment = logic::probe_environment();
         assert!(
             environment.editors.is_empty(),
             "This test requires no existing Editor"
@@ -1197,6 +1200,9 @@ mod tests {
             parent_directory: parent.to_string_lossy().into(),
         };
         let mut report = json!({"setupVersion":env!("CARGO_PKG_VERSION"), "editorVersion":EDITOR_VERSION,"prerequisitesVerified":false,"cancellationVerified":false,"existingInstallReused":false,"missingJdkRepaired":false,"activationHandoffRequired":false,"completed":false,"projectCreated":false,"unityAccountUsed":false,"licenseActivationTested":false});
+        report["platform"] = json!(std::env::consts::OS);
+        report["architecture"] = json!(std::env::consts::ARCH);
+        report["hubInitiallyInstalled"] = json!(environment.hub_installed);
         let checkpoint = |value: &Value| {
             fs::write(
                 parent.join("creator-prerequisite-acceptance.json"),
@@ -1211,7 +1217,10 @@ mod tests {
             cancelled.contains("cancelled before installation"),
             "Preflight did not reach cancellation: {cancelled}"
         );
-        assert!(!logic::probe_environment().hub_installed);
+        assert_eq!(
+            logic::probe_environment().hub_installed,
+            environment.hub_installed
+        );
         assert!(logic::probe_environment().editors.is_empty());
         assert!(!parent.join(&request.project_name).exists());
         report["cancellationVerified"] = json!(true);
@@ -1248,7 +1257,12 @@ mod tests {
             .find(|e| e.exact_recipe)
             .unwrap();
         let root = fs::canonicalize(&installed.root).unwrap();
-        let java = root.join("Editor/Data/PlaybackEngines/AndroidPlayer/OpenJDK/bin/java.exe");
+        let android = logic::editor_data(&root).join("PlaybackEngines/AndroidPlayer");
+        let java = android.join(if cfg!(windows) {
+            "OpenJDK/bin/java.exe"
+        } else {
+            "OpenJDK/bin/java"
+        });
         assert!(fs::canonicalize(&java).unwrap().starts_with(&root));
         fs::remove_file(&java).unwrap();
         assert!(!logic::probe_environment().ready);
@@ -1273,24 +1287,46 @@ mod tests {
         checkpoint(&report);
         let mut tool_versions = serde_json::Map::new();
         for (relative, arg) in [
-            ("OpenJDK/bin/java.exe", "-version"),
-            ("OpenJDK/bin/javac.exe", "-version"),
-            ("SDK/platform-tools/adb.exe", "version"),
             (
-                "NDK/toolchains/llvm/prebuilt/windows-x86_64/bin/clang.exe",
+                if cfg!(windows) {
+                    "OpenJDK/bin/java.exe"
+                } else {
+                    "OpenJDK/bin/java"
+                },
+                "-version",
+            ),
+            (
+                if cfg!(windows) {
+                    "OpenJDK/bin/javac.exe"
+                } else {
+                    "OpenJDK/bin/javac"
+                },
+                "-version",
+            ),
+            (
+                if cfg!(windows) {
+                    "SDK/platform-tools/adb.exe"
+                } else {
+                    "SDK/platform-tools/adb"
+                },
+                "version",
+            ),
+            (
+                match std::env::consts::OS {
+                    "windows" => "NDK/toolchains/llvm/prebuilt/windows-x86_64/bin/clang.exe",
+                    "macos" => "NDK/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang",
+                    _ => "NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang",
+                },
                 "--version",
             ),
         ] {
-            use std::os::windows::process::CommandExt;
-            let executable = root
-                .join("Editor/Data/PlaybackEngines/AndroidPlayer")
-                .join(relative);
-            let output = Command::new(executable)
-                .arg(arg)
-                .creation_flags(0x08000000)
-                .stdin(Stdio::null())
-                .output()
-                .unwrap();
+            let mut command = Command::new(android.join(relative));
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                command.creation_flags(0x08000000);
+            }
+            let output = command.arg(arg).stdin(Stdio::null()).output().unwrap();
             assert!(
                 output.status.success(),
                 "Installed tool cannot run: {relative}"

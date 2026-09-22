@@ -219,7 +219,7 @@ fn executable_for(root: &Path) -> PathBuf {
     }
 }
 
-fn editor_data(root: &Path) -> PathBuf {
+pub(crate) fn editor_data(root: &Path) -> PathBuf {
     if cfg!(target_os = "macos") {
         root.join("Unity.app/Contents")
     } else {

@@ -1,4 +1,4 @@
-name: Windows Prerequisite Installation
+name: Prerequisite Installation
 
 on:
   workflow_dispatch:
@@ -8,6 +8,11 @@ on:
         type: boolean
         required: true
         default: false
+      platforms:
+        description: Disposable installation hosts
+        type: choice
+        options: [windows, native, all]
+        default: windows
 
 permissions:
   contents: read
@@ -18,7 +23,7 @@ concurrency:
 
 jobs:
   clean-install:
-    if: github.repository == 'BOBWORKS-XR/CREATOR-PROJECT-SETUP'
+    if: github.repository == 'BOBWORKS-XR/CREATOR-PROJECT-SETUP' && inputs.platforms != 'native'
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
@@ -136,6 +141,88 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: prerequisite-install-${{ github.sha }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/prerequisite-evidence/
+
+  native-install:
+    if: github.repository == 'BOBWORKS-XR/CREATOR-PROJECT-SETUP' && inputs.platforms != 'windows'
+    name: Native installation (${{ matrix.label }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            label: Linux x64
+          - os: macos-latest
+            label: macOS Apple silicon
+          - os: macos-15-intel
+            label: macOS Intel
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Require explicit native test approval
+        shell: bash
+        env:
+          APPROVED: ${{ inputs.accept_test_licences }}
+        run: |
+          set -euo pipefail
+          test "$APPROVED" = true
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          df -h
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          cache-on-failure: true
+      - name: Install Linux Tauri dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libayatana-appindicator3-dev libxdo-dev libssl-dev librsvg2-dev patchelf build-essential file
+      - run: npm ci
+      - name: Use a canonical temporary path on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: echo "TMPDIR=$(node -p "require('fs').realpathSync(require('os').tmpdir())")" >> "$GITHUB_ENV"
+      - run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
+      - run: cargo test --release --locked --manifest-path src-tauri/Cargo.toml
+      - name: Install, reuse and repair real Unity requirements
+        shell: bash
+        env:
+          CREATOR_SETUP_ACCEPT_TEST_LICENSES: 'true'
+        run: |
+          set -euo pipefail
+          cargo test --release --locked --manifest-path src-tauri/Cargo.toml bootstrap::tests::disposable_install_smoke -- --ignored --exact --nocapture 2>&1 | tee prerequisite-install.log
+      - name: Stage only installation diagnostics (no account data)
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/prerequisite-evidence"
+          test ! -f prerequisite-install.log || cp prerequisite-install.log "$RUNNER_TEMP/prerequisite-evidence/"
+          test ! -f "$RUNNER_TEMP/creator-prerequisite-acceptance.json" || cp "$RUNNER_TEMP/creator-prerequisite-acceptance.json" "$RUNNER_TEMP/prerequisite-evidence/"
+          if [ "$RUNNER_OS" = macOS ]; then
+            logs="$HOME/Library/Application Support/CreatorProjectSetup/logs"
+          else
+            logs="${XDG_DATA_HOME:-$HOME/.local/share}/CreatorProjectSetup/logs"
+          fi
+          for directory in "$logs"/requirements-*; do
+            test ! -d "$directory" || cp -R "$directory" "$RUNNER_TEMP/prerequisite-evidence/"
+          done
+          df -h > "$RUNNER_TEMP/prerequisite-evidence/disk-space.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: prerequisite-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
           retention-days: 14
           if-no-files-found: warn
           path: ${{ runner.temp }}/prerequisite-evidence/
