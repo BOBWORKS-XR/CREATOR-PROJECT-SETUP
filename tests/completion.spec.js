@@ -324,6 +324,13 @@ test('first launch requires saved terms acceptance before environment checks', a
   await setup(page, { freshTerms: true });
   const dialog = page.locator('#usage-terms-dialog');
   await expect(dialog).toBeVisible();
+  const layout = await dialog.evaluate(node => {
+    const rect = node.getBoundingClientRect();
+    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2, background: getComputedStyle(node).backgroundColor, viewport: { x: innerWidth / 2, y: innerHeight / 2 } };
+  });
+  expect(Math.abs(layout.x - layout.viewport.x)).toBeLessThan(2);
+  expect(Math.abs(layout.y - layout.viewport.y)).toBeLessThan(2);
+  expect(layout.background).toBe('rgb(17, 21, 24)');
   await expect(page.locator('#create-button')).toBeDisabled();
   expect(await page.locator('#create-button').evaluate(node => node.closest('main').inert)).toBe(true);
   await expect.poll(() => page.evaluate(() => window.calls.some(call => call.command === 'probe_environment'))).toBe(false);
@@ -342,6 +349,13 @@ test('fixed Setup help identifies this app and explains common setup issues', as
   const help = page.locator('#context-help-dialog');
   await page.locator('#context-help-open').click();
   await expect(help).toBeVisible();
+  const rect = await help.evaluate(node => {
+    const bounds = node.getBoundingClientRect();
+    return { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2, background: getComputedStyle(node).backgroundColor, viewport: { x: innerWidth / 2, y: innerHeight / 2 } };
+  });
+  expect(Math.abs(rect.x - rect.viewport.x)).toBeLessThan(2);
+  expect(Math.abs(rect.y - rect.viewport.y)).toBeLessThan(2);
+  expect(rect.background).toBe('rgb(17, 21, 24)');
   await expect(help).toContainText('This app creates and validates Unity projects');
   await expect(help).toContainText('Creator Works MCP');
   await expect(help).toContainText('The app preserves the project');

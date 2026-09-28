@@ -109,7 +109,8 @@ footer { display: flex; justify-content: space-between; align-items: center; fle
 .footer-version { margin-left: 5px; color: #7f8c95; }
 .footer-links { display: flex; gap: 18px; flex-wrap: wrap; }
 footer .text-button { font-size: 11px; }
-.usage-terms-dialog { width: min(620px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 22px; border: 1px solid #3b454d; border-radius: 6px; background: #111518; color: #edf1f3; }
+.usage-terms-dialog, .context-help-dialog { position: fixed; inset: 0; margin: auto; }
+.usage-terms-dialog { width: min(620px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 22px; border: 1px solid #3e4951; border-radius: 6px; background: #111518; color: #edf1f3; }
 .usage-terms-dialog::backdrop { background: #000b; }
 .usage-terms-dialog h2 { font-size: 18px; }
 .terms-version { margin-top: 5px; color: var(--muted); font-size: 12px; }
