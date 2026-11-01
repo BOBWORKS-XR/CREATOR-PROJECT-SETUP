@@ -32,19 +32,18 @@ See [verified upgrade checks and limits](docs/RELEASE-0.3.1.md).
 - Update a recognized old plugin helper with a backup. Unknown or edited files
   remain protected; Unity must be closed for the helper update.
 
-## Pinned Recipe
+## Project Recipe
 
 | Requirement | Version / scope |
 | --- | --- |
 | Unity Editor | 6000.3.21f1 |
-| Creator SDK | 4.0.14 |
+| Creator SDK | Latest `latest` release from the Creator SDK registry, resolved when creating each project |
 | URP | 17.3.0 as resolved by the approved Editor |
 | Input System | 1.20.0 |
 | Android | Build Support, SDK, NDK and OpenJDK, required |
 | Windows | Standalone build support, required |
 
-Creator SDK 4.0.14 declares URP 17.4.0; the pinned Editor resolves URP 17.3.0.
-The app records both values. Recipe updates require a separate validation pass.
+Creator SDK versions are resolved from the registry for each new project and recorded in its setup receipt. The app records the SDK declared URP requirement alongside the pinned Editor resolved URP version.
 
 Unity licence activation, permission prompts and installation licence approval
 can still require user interaction. Optional automatic Unity Hub registration
