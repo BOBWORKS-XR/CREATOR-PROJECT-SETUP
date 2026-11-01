@@ -7,13 +7,14 @@ use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
+use semver::Version;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tar::Archive;
 use wait_timeout::ChildExt;
 
 pub const EDITOR_VERSION: &str = "6000.3.21f1";
 pub const EDITOR_CHANGESET: &str = "c02631ffc030";
-pub const CREATOR_SDK_VERSION: &str = "4.0.14";
+pub const CREATOR_SDK_VERSION: &str = "4.0.25";
 pub const URP_VERSION: &str = "17.3.0";
 pub const INPUT_SYSTEM_VERSION: &str = "1.20.0";
 pub const SDK_DECLARED_URP_VERSION: &str = "17.4.0";
@@ -522,7 +523,37 @@ fn extract_project_template(template: &Path, target: &Path) -> Result<(), String
     Ok(())
 }
 
-fn update_manifest(project: &Path) -> Result<(), String> {
+pub fn latest_creator_sdk_version() -> Result<String, String> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()
+        .map_err(|_| "Cannot initialize the Creator SDK registry request.")?;
+    let response = client
+        .get(format!("{REGISTRY_URL}/com.sidequest.creator-sdk"))
+        .send()
+        .map_err(|_| "Cannot fetch the latest Creator SDK version from its registry.")?;
+    if !response.status().is_success() {
+        return Err("Creator SDK registry did not return package metadata.".into());
+    }
+    let metadata: Value = response
+        .json()
+        .map_err(|_| "Creator SDK registry returned invalid package metadata.")?;
+    let version = metadata
+        .get("dist-tags")
+        .and_then(|tags| tags.get("latest"))
+        .and_then(Value::as_str)
+        .ok_or("Creator SDK registry has no latest release tag.")?;
+    Version::parse(version)
+        .map_err(|_| "Creator SDK registry returned an invalid latest version.")?;
+    Ok(version.to_owned())
+}
+
+fn recipe_for_creator_sdk(version: &str) -> Recipe {
+    let mut result = recipe();
+    result.creator_sdk_version = version.to_owned();
+    result
+}
+fn update_manifest(project: &Path, creator_sdk_version: &str) -> Result<(), String> {
     let path = project.join("Packages/manifest.json");
     let text =
         fs::read_to_string(&path).map_err(|error| format!("Cannot read manifest: {error}"))?;
@@ -541,7 +572,7 @@ fn update_manifest(project: &Path) -> Result<(), String> {
     dependencies.insert("com.unity.inputsystem".into(), json!(INPUT_SYSTEM_VERSION));
     dependencies.insert(
         "com.sidequest.creator-sdk".into(),
-        json!(CREATOR_SDK_VERSION),
+        json!(creator_sdk_version),
     );
     dependencies.insert(
         "com.unity.render-pipelines.universal".into(),
@@ -596,9 +627,13 @@ fn update_project_name(project: &Path, project_name: &str) -> Result<(), String>
 }
 
 pub(crate) fn validation_script() -> String {
+    validation_script_for(CREATOR_SDK_VERSION)
+}
+
+pub(crate) fn validation_script_for(creator_sdk_version: &str) -> String {
     include_str!("ProjectSetupValidator.cs")
         .replace("@@EDITOR_VERSION@@", EDITOR_VERSION)
-        .replace("@@CREATOR_SDK_VERSION@@", CREATOR_SDK_VERSION)
+        .replace("@@CREATOR_SDK_VERSION@@", creator_sdk_version)
         .replace("@@URP_VERSION@@", URP_VERSION)
         .replace("@@INPUT_SYSTEM_VERSION@@", INPUT_SYSTEM_VERSION)
 }
@@ -818,6 +853,7 @@ pub fn create_project(
             environment.blockers.join(" ")
         ));
     }
+    let creator_sdk_version = latest_creator_sdk_version()?;
     let editor = environment
         .editors
         .iter()
@@ -834,7 +870,7 @@ pub fn create_project(
     let setup = (|| -> Result<CreationResult, String> {
         progress(SetupProgress::new(
             2,
-            "Extracting the official URP template and adding the pinned Creator SDK.",
+            "Extracting the official URP template and adding the latest Creator SDK.",
         ));
         extract_project_template(&template, &target)?;
         fs::write(
@@ -844,14 +880,14 @@ pub fn create_project(
             ),
         )
         .map_err(|error| format!("Cannot write ProjectVersion.txt: {error}"))?;
-        update_manifest(&target)?;
+        update_manifest(&target, &creator_sdk_version)?;
         update_project_name(&target, project_name)?;
 
         let validator_dir = target.join("Assets/Editor");
         fs::create_dir_all(&validator_dir)
             .map_err(|error| format!("Cannot create temporary validator folder: {error}"))?;
         let validator = validator_dir.join("CreatorProjectSetupValidator.cs");
-        fs::write(&validator, validation_script())
+        fs::write(&validator, validation_script_for(&creator_sdk_version))
             .map_err(|error| format!("Cannot write temporary validator: {error}"))?;
 
         let status_folder = target.join(".creator-project-setup");
@@ -864,7 +900,7 @@ pub fn create_project(
                 "success": false,
                 "stage": "launching_unity",
                 "projectPath": target,
-                "recipe": recipe(),
+                "recipe": recipe_for_creator_sdk(&creator_sdk_version),
                 "activeBuildTarget": "android",
                 "requiredBuildTargets": ["android", "windows"],
                 "note": "Unity setup has started. This is not a completion receipt."
@@ -930,7 +966,7 @@ pub fn create_project(
                 "success": true,
                 "stage": "validated",
                 "projectPath": target,
-                "recipe": recipe(),
+                "recipe": recipe_for_creator_sdk(&creator_sdk_version),
                 "activeBuildTarget": "android",
                 "requiredBuildTargets": ["android", "windows"],
                 "validation": validation,
@@ -962,7 +998,7 @@ pub fn create_project(
                 "success": false,
                 "stage": "failed",
                 "projectPath": target,
-                "recipe": recipe(),
+                "recipe": recipe_for_creator_sdk(&creator_sdk_version),
                 "error": error,
                 "note": "The project was preserved for diagnosis and was not deleted automatically."
             }),
@@ -1239,7 +1275,7 @@ mod tests {
     fn recipe_is_pinned() {
         let value = recipe();
         assert_eq!(value.editor_version, "6000.3.21f1");
-        assert_eq!(value.creator_sdk_version, "4.0.14");
+        assert_eq!(value.creator_sdk_version, "4.0.25");
         assert_eq!(value.urp_version, "17.3.0");
         assert_eq!(value.input_system_version, "1.20.0");
         assert_eq!(value.sdk_declared_urp_version, "17.4.0");
@@ -1341,7 +1377,7 @@ mod tests {
         )
         .unwrap();
         fs::write(packages.join("packages-lock.json"), "{}").unwrap();
-        update_manifest(&root).unwrap();
+        update_manifest(&root, CREATOR_SDK_VERSION).unwrap();
         let value: Value =
             serde_json::from_str(&fs::read_to_string(packages.join("manifest.json")).unwrap())
                 .unwrap();
